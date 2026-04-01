@@ -6,3 +6,162 @@ datasource db {
   provider = "mysql"
   url      = env("DATABASE_URL")
 }
+
+model Usuario {
+  id                Int                @id @default(autoincrement())
+  nombre            String             @db.VarChar(100)
+  email             String             @unique @db.VarChar(150)
+  password_hash     String             @db.VarChar(255)
+  rol               UsuarioRol
+  activo            Boolean            @default(true)
+  creado_en         DateTime           @default(now())
+
+  especialidades    Especialidad[]
+  tareas            Tarea[]            @relation("TecnicoTareas")
+  tareas_canceladas Tarea[]            @relation("AdminCancelaciones")
+  historial         HistorialEstado[]
+
+  @@map("usuarios")
+}
+
+model Categoria {
+  id                Int                @id @default(autoincrement())
+  nombre            String             @unique @db.VarChar(100)
+  peligrosidad      Int
+  radio_agrupacion  Int
+  activo            Boolean            @default(true)
+
+  especialidades    Especialidad[]
+  reportes          Reporte[]
+  incidencias       Incidencia[]
+
+  @@map("categorias")
+}
+
+model Especialidad {
+  id                Int                @id @default(autoincrement())
+  usuario_id        Int
+  categoria_id      Int
+
+  usuario           Usuario            @relation(fields: [usuario_id], references: [id])
+  categoria         Categoria          @relation(fields: [categoria_id], references: [id])
+
+  @@unique([usuario_id, categoria_id])
+  @@map("especialidades")
+}
+
+model Reporte {
+  id                Int                @id @default(autoincrement())
+  descripcion       String             @db.Text
+  foto_url          String             @db.VarChar(500)
+  latitud           Decimal            @db.Decimal(10, 8)
+  longitud          Decimal            @db.Decimal(11, 8)
+  estado            ReporteEstado      @default(pendiente_revision)
+  confianza_ia      Decimal?           @db.Decimal(5, 2)
+  categoria_ia_id   Int?
+  resumen_ia        String?            @db.Text
+  incidencia_id     Int?
+  creado_en         DateTime           @default(now())
+
+  categoria_ia      Categoria?         @relation(fields: [categoria_ia_id], references: [id])
+  incidencia        Incidencia?        @relation(fields: [incidencia_id], references: [id])
+
+  @@map("reportes")
+}
+
+model Incidencia {
+  id                Int                @id @default(autoincrement())
+  categoria_id      Int
+  latitud           Decimal            @db.Decimal(10, 8)
+  longitud          Decimal            @db.Decimal(11, 8)
+  estado            IncidenciaEstado   @default(pendiente)
+  puntaje_prioridad Decimal            @db.Decimal(8, 2) @default(0)
+  contador_reportes Int                @default(1)
+  creado_en         DateTime           @default(now())
+  actualizado_en    DateTime           @updatedAt
+
+  categoria         Categoria          @relation(fields: [categoria_id], references: [id])
+  reportes          Reporte[]
+  tareas            Tarea[]
+
+  @@map("incidencias")
+}
+
+model Tarea {
+  id                    Int              @id @default(autoincrement())
+  incidencia_id         Int
+  tecnico_id            Int
+  estado                TareaEstado      @default(asignada)
+  motivo_atraso         MotivoAtraso?
+  motivo_cancelacion    String?          @db.Text
+  foto_evidencia_url    String?          @db.VarChar(500)
+  cancelada_por_id      Int?
+  creado_en             DateTime         @default(now())
+  actualizado_en        DateTime         @updatedAt
+  completada_en         DateTime?
+
+  incidencia            Incidencia       @relation(fields: [incidencia_id], references: [id])
+  tecnico               Usuario          @relation("TecnicoTareas", fields: [tecnico_id], references: [id])
+  cancelada_por         Usuario?         @relation("AdminCancelaciones", fields: [cancelada_por_id], references: [id])
+  historial             HistorialEstado[]
+
+  @@map("tareas")
+}
+
+model HistorialEstado {
+  id                Int              @id @default(autoincrement())
+  tarea_id          Int
+  estado_anterior   TareaEstado
+  estado_nuevo      TareaEstado
+  cambiado_por_id   Int?
+  creado_en         DateTime         @default(now())
+
+  tarea             Tarea            @relation(fields: [tarea_id], references: [id])
+  cambiado_por      Usuario?         @relation(fields: [cambiado_por_id], references: [id])
+
+  @@map("historial_estados")
+}
+
+model ConfiguracionSistema {
+  id                Int              @id @default(autoincrement())
+  clave             String           @unique @db.VarChar(100)
+  valor             String           @db.VarChar(255)
+  descripcion       String?          @db.VarChar(255)
+
+  @@map("configuracion_sistema")
+}
+
+enum UsuarioRol {
+  admin
+  tecnico
+}
+
+enum ReporteEstado {
+  pendiente_revision
+  pendiente
+  asignado
+  descartado
+}
+
+enum IncidenciaEstado {
+  pendiente
+  asignado
+  en_curso
+  completado
+}
+
+enum TareaEstado {
+  asignada
+  aceptada
+  en_curso
+  atrasada
+  completada
+  cancelada
+}
+
+enum MotivoAtraso {
+  materiales
+  complejidad
+  clima
+  otro
+}
