@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1045.0",
     "@prisma/client": "^6.19.3",
     "bcryptjs": "^3.0.3",
     "leaflet": "^1.9.4",
@@ -17,7 +18,8 @@
     "next-auth": "^4.24.13",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
-    "react-leaflet": "^5.0.0"
+    "react-leaflet": "^5.0.0",
+    "uuid": "^14.0.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -26,6 +28,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/uuid": "^10.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.2.1",
     "prisma": "^6.19.3",
