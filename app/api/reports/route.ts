@@ -45,3 +45,37 @@ export async function POST(request: NextRequest) {
     )
   }
 }
+
+export async function GET() {
+  try {
+    // Obtener todos los reportes activos excepto los descartados
+    const reportes = await prisma.reporte.findMany({
+      where: {
+        estado: {
+          not: 'descartado'
+        }
+      },
+      select: {
+        id: true,
+        latitud: true,
+        longitud: true,
+        estado: true,
+        descripcion: true,
+        creado_en: true,
+        categoria_ia_id: true,
+        resumen_ia: true,
+        incidencia_id: true,
+        foto_url: true, 
+      }
+    })
+
+    return NextResponse.json({ success: true, reportes }, { status: 200 })
+
+  } catch (error) {
+    console.error('Error al obtener reportes:', error)
+    return NextResponse.json(
+      { error: 'Error interno del servidor' },
+      { status: 500 }
+    )
+  }
+}
