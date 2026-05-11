@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '../../lib/prisma'
-import { uploadPhoto } from '../../lib/uploadPhoto'
+import { ReporteService } from '../../lib/services/ReporteService'
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,7 +11,6 @@ export async function POST(request: NextRequest) {
     const longitud = formData.get('longitud') as string | null
     const categoriaId = formData.get('categoriaId') as string | null
 
-    // Validar campos obligatorios
     if (!foto || !descripcion || !latitud || !longitud || !categoriaId) {
       return NextResponse.json(
         { error: 'Faltan campos obligatorios' },
@@ -20,20 +18,13 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Subir foto a Cloudflare R2
-    const fotoUrl = await uploadPhoto(foto)
-
-    // Guardar reporte en MySQL con estado inicial pendiente_revision
-    const reporte = await prisma.reporte.create({
-      data: {
-        descripcion,
-        foto_url: fotoUrl,
-        latitud: parseFloat(latitud),
-        longitud: parseFloat(longitud),
-        estado: 'pendiente_revision',
-        categoria_ia_id: parseInt(categoriaId),
-      },
-    })
+    const reporte = await ReporteService.crear(
+      foto,
+      descripcion,
+      parseFloat(latitud),
+      parseFloat(longitud),
+      parseInt(categoriaId)
+    )
 
     return NextResponse.json({ success: true, reporte }, { status: 201 })
 
@@ -48,27 +39,7 @@ export async function POST(request: NextRequest) {
 
 export async function GET() {
   try {
-    // Obtener todos los reportes activos excepto los descartados
-    const reportes = await prisma.reporte.findMany({
-      where: {
-        estado: {
-          not: 'descartado'
-        }
-      },
-      select: {
-        id: true,
-        latitud: true,
-        longitud: true,
-        estado: true,
-        descripcion: true,
-        creado_en: true,
-        categoria_ia_id: true,
-        resumen_ia: true,
-        incidencia_id: true,
-        foto_url: true, 
-      }
-    })
-
+    const reportes = await ReporteService.obtenerActivos()
     return NextResponse.json({ success: true, reportes }, { status: 200 })
 
   } catch (error) {
