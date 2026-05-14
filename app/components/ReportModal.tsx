@@ -84,41 +84,61 @@ export default function ReportModal({ isOpen, onClose }: ReportModalProps) {
     setCameraStream(null)
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setSubmitMessage(null)
+ const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault()
+  setSubmitMessage(null)
 
-    if (!description.trim()) {
-      setSubmitMessage('Describe el problema')
-      return
-    }
-
-    if (!photoDataUrl) {
-      setSubmitMessage('Captura una foto')
-      return
-    }
-
-    if (!coords) {
-      setSubmitMessage('Ubicación no disponible')
-      return
-    }
-
-    setIsSubmitting(true)
-
-    const report = {
-      descripcion: description.trim(),
-      fotoDataUrl: photoDataUrl,
-      latitud: coords.latitude,
-      longitud: coords.longitude,
-      precision: coords.accuracy ?? null,
-      creadoEn: new Date().toISOString(),
-    }
-
-    console.log('Reporte enviado:', report)
-    setShowSuccess(true)
-    setIsSubmitting(false)
+  if (!description.trim()) {
+    setSubmitMessage('Describe el problema')
+    return
   }
 
+  if (!photoDataUrl) {
+    setSubmitMessage('Captura una foto')
+    return
+  }
+
+  if (!coords) {
+    setSubmitMessage('Ubicación no disponible')
+    return
+  }
+
+  setIsSubmitting(true)
+
+  try {
+    // Convertir dataUrl a File para enviar como form-data
+    const response = await fetch(photoDataUrl)
+    const blob = await response.blob()
+    const fotoFile = new File([blob], 'foto.jpg', { type: 'image/jpeg' })
+
+    // Armar el formData
+    const formData = new FormData()
+    formData.append('foto', fotoFile)
+    formData.append('descripcion', description.trim())
+    formData.append('latitud', String(coords.latitude))
+    formData.append('longitud', String(coords.longitude))
+    formData.append('categoriaId', '1') // temporal hasta integrar IA
+
+    // Llamar al endpoint POST /api/reports
+    const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/reports`, {
+      method: 'POST',
+      body: formData,
+    })
+
+    if (!res.ok) {
+      const data = await res.json()
+      setSubmitMessage(data.error || 'Error al enviar el reporte')
+      return
+    }
+
+    setShowSuccess(true)
+
+  } catch (error) {
+    setSubmitMessage('Error de conexión, intenta nuevamente')
+  } finally {
+    setIsSubmitting(false)
+  }
+}
   const handleClose = () => {
     cameraStream?.getTracks().forEach((track) => track.stop())
     setCameraStream(null)
