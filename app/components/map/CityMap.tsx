@@ -1,74 +1,108 @@
-'use client' // Indica a Next.js que este componente se ejecuta solo en el navegador, no en el servidor
+'use client'
 
-import { useEffect, useState } from 'react'
-import L from 'leaflet' // Librería principal de Leaflet para crear mapas interactivos
+import { useEffect, useRef, useState } from 'react'
+import L from 'leaflet'
 // @ts-ignore
-import 'leaflet/dist/leaflet.css' // Estilos base necesarios para que el mapa se vea correctamente
+import 'leaflet/dist/leaflet.css'
 import ReportModal from '../ReportModal'
 
+const getColor = (estado: string) => {
+  switch (estado) {
+    case 'pendiente_revision': return '#94a3b8'
+    case 'pendiente': return '#ef4444'
+    case 'asignado': return '#f97316'
+    case 'en_curso': return '#f97316'
+    case 'completado': return '#22c55e'
+    default: return '#94a3b8'
+  }
+}
+
 export default function CityMap() {
-  // Estado para saber si el mapa está en modo oscuro o claro
   const [isDark, setIsDark] = useState(true)
   const [isReportModalOpen, setIsReportModalOpen] = useState(false)
+  const mapRef = useRef<L.Map | null>(null)
+  const markersRef = useRef<L.CircleMarker[]>([])
+
+  // Función que carga y actualiza los marcadores en el mapa
+  const loadReportes = () => {
+    if (!mapRef.current) return
+
+    // Limpiar marcadores anteriores
+    markersRef.current.forEach(m => m.remove())
+    markersRef.current = []
+
+    fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/reports`)
+      .then(res => res.json())
+      .then(data => {
+        if (!data.reportes || !mapRef.current) return
+        data.reportes.forEach((reporte: any) => {
+          const color = getColor(reporte.estado)
+          const marker = L.circleMarker(
+            [parseFloat(reporte.latitud), parseFloat(reporte.longitud)],
+            {
+              radius: 10,
+              fillColor: color,
+              color: '#ffffff',
+              weight: 2,
+              opacity: 1,
+              fillOpacity: 0.9
+            }
+          )
+          .bindPopup(`
+  <div style="min-width:200px">
+    <img src="${reporte.foto_url}" 
+      style="width:100%;height:120px;object-fit:cover;border-radius:6px;margin-bottom:8px" 
+      alt="Foto del reporte"
+    />
+    <b style="text-transform:capitalize">${reporte.estado.replace('_', ' ')}</b>
+    <p style="margin:4px 0;font-size:13px">${reporte.descripcion}</p>
+  </div>
+`)
+          .addTo(mapRef.current!)
+          markersRef.current.push(marker)
+        })
+      })
+      .catch(err => console.error('Error cargando reportes:', err))
+  }
 
   useEffect(() => {
-    // Creamos el mapa centrado en Talca, Chile con zoom 13
-    // -35.4264 es la latitud y -71.6554 es la longitud de Talca
     const map = L.map('map').setView([-35.4264, -71.6554], 13)
+    mapRef.current = map
 
-    // Capa de mapa en modo oscuro usando Jawg Maps
-    // {z}/{x}/{y} son variables que Leaflet reemplaza automáticamente
-    // según el nivel de zoom y la posición del mapa
     const darkLayer = L.tileLayer(
       'https://tile.jawg.io/jawg-dark/{z}/{x}/{y}{r}.png?access-token=' + process.env.NEXT_PUBLIC_JAWG_TOKEN,
       { attribution: '<a href="https://jawg.io">Jawg Maps</a>' }
     )
 
-    // Capa de mapa en modo claro usando el estilo streets de Jawg Maps
     const lightLayer = L.tileLayer(
       'https://tile.jawg.io/jawg-streets/{z}/{x}/{y}{r}.png?access-token=' + process.env.NEXT_PUBLIC_JAWG_TOKEN,
       { attribution: '<a href="https://jawg.io">Jawg Maps</a>' }
     )
 
-    // Agregamos la capa oscura por defecto al iniciar
     darkLayer.addTo(map)
 
-    // Creamos un control personalizado de Leaflet para el botón de cambio de tema
-    // position: 'topright' lo ubica en la esquina superior derecha del mapa
     const toggleBtn = new L.Control({ position: 'topright' })
-
-    // onAdd se ejecuta cuando el control se agrega al mapa
-    // Aquí definimos el HTML y el comportamiento del botón
     toggleBtn.onAdd = () => {
-      const btn = L.DomUtil.create('button') // Creamos un elemento button en el DOM
+      const btn = L.DomUtil.create('button')
       btn.innerHTML = '☀️ Modo claro'
       btn.style.cssText = 'padding:8px 12px;background:white;border:none;border-radius:6px;cursor:pointer;font-size:14px;box-shadow:0 2px 6px rgba(0,0,0,0.3)'
-
-      // Variable local para rastrear el estado actual del tema
       let dark = true
-
-      // Evento click del botón — alterna entre modo oscuro y claro
       btn.onclick = () => {
         if (dark) {
-          // Si está en oscuro: removemos la capa oscura y agregamos la clara
           map.removeLayer(darkLayer)
           lightLayer.addTo(map)
           btn.innerHTML = 'Modo oscuro'
         } else {
-          // Si está en claro: removemos la capa clara y agregamos la oscura
           map.removeLayer(lightLayer)
           darkLayer.addTo(map)
           btn.innerHTML = 'Modo claro'
         }
-        dark = !dark // Invertimos el estado
+        dark = !dark
       }
       return btn
     }
-
-    // Agregamos el botón al mapa para testear su funcionalidad
     toggleBtn.addTo(map)
 
-    // Crear botón flotante de reportar
     const reportBtn = new L.Control({ position: 'bottomright' })
     reportBtn.onAdd = () => {
       const btn = L.DomUtil.create('button')
@@ -81,22 +115,35 @@ export default function CityMap() {
     }
     reportBtn.addTo(map)
 
-    // Función de limpieza: cuando el componente se desmonta
-    // removemos el mapa para evitar duplicados al recargar la página
+    // Cargar reportes al iniciar
+    loadReportes()
+
+    // Polling cada 30 segundos
+    const interval = setInterval(loadReportes, 30000)
+
     return () => {
+      clearInterval(interval) // Limpiar el polling al desmontar
+      mapRef.current = null
       map.remove()
     }
-  }, []) // El array vacío indica que useEffect solo se ejecuta una vez al montar el componente
+  }, [])
+
+  // Cuando se cierra el modal recarga los reportes inmediatamente
+  const handleModalClose = () => {
+    setIsReportModalOpen(false)
+    loadReportes()
+  }
 
   return (
     <>
-      {/* Contenedor del mapa — el id="map" es el que usa L.map('map') arriba */}
-      {/* height: 100vh hace que ocupe toda la altura de la pantalla */}
       <div
         id="map"
         style={{ width: '100%', height: '100vh' }}
       />
-      <ReportModal isOpen={isReportModalOpen} onClose={() => setIsReportModalOpen(false)} />
+      <ReportModal
+        isOpen={isReportModalOpen}
+        onClose={handleModalClose}
+      />
     </>
   )
 }
