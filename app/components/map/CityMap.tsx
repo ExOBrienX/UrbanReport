@@ -2,11 +2,14 @@
 
 import { useEffect, useState } from 'react'
 import L from 'leaflet' // Librería principal de Leaflet para crear mapas interactivos
+// @ts-ignore
 import 'leaflet/dist/leaflet.css' // Estilos base necesarios para que el mapa se vea correctamente
+import ReportModal from '../ReportModal'
 
 export default function CityMap() {
   // Estado para saber si el mapa está en modo oscuro o claro
   const [isDark, setIsDark] = useState(true)
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false)
 
   useEffect(() => {
     // Creamos el mapa centrado en Talca, Chile con zoom 13
@@ -32,7 +35,7 @@ export default function CityMap() {
 
     // Creamos un control personalizado de Leaflet para el botón de cambio de tema
     // position: 'topright' lo ubica en la esquina superior derecha del mapa
-    const toggleBtn = L.control({ position: 'topright' })
+    const toggleBtn = new L.Control({ position: 'topright' })
 
     // onAdd se ejecuta cuando el control se agrega al mapa
     // Aquí definimos el HTML y el comportamiento del botón
@@ -65,6 +68,19 @@ export default function CityMap() {
     // Agregamos el botón al mapa para testear su funcionalidad
     toggleBtn.addTo(map)
 
+    // Crear botón flotante de reportar
+    const reportBtn = new L.Control({ position: 'bottomright' })
+    reportBtn.onAdd = () => {
+      const btn = L.DomUtil.create('button')
+      btn.innerHTML = '📋 Reportar'
+      btn.style.cssText = 'padding:12px 16px;background:#1e293b;border:none;border-radius:6px;cursor:pointer;font-size:14px;font-weight:600;color:white;box-shadow:0 4px 12px rgba(0,0,0,0.3);transition:background 0.2s;transform:translateY(-40px);'
+      btn.onclick = () => setIsReportModalOpen(true)
+      btn.onmouseover = () => (btn.style.background = '#0f172a')
+      btn.onmouseout = () => (btn.style.background = '#1e293b')
+      return btn
+    }
+    reportBtn.addTo(map)
+
     // Función de limpieza: cuando el componente se desmonta
     // removemos el mapa para evitar duplicados al recargar la página
     return () => {
@@ -73,11 +89,14 @@ export default function CityMap() {
   }, []) // El array vacío indica que useEffect solo se ejecuta una vez al montar el componente
 
   return (
-    // Contenedor del mapa — el id="map" es el que usa L.map('map') arriba
-    // height: 100vh hace que ocupe toda la altura de la pantalla
-    <div
-      id="map"
-      style={{ width: '100%', height: '100vh' }}
-    />
+    <>
+      {/* Contenedor del mapa — el id="map" es el que usa L.map('map') arriba */}
+      {/* height: 100vh hace que ocupe toda la altura de la pantalla */}
+      <div
+        id="map"
+        style={{ width: '100%', height: '100vh' }}
+      />
+      <ReportModal isOpen={isReportModalOpen} onClose={() => setIsReportModalOpen(false)} />
+    </>
   )
 }
