@@ -18,5 +18,5 @@ export async function uploadPhoto(file: File): Promise<string> {
     })
   )
 
-  return `https://${process.env.CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com/${R2_BUCKET}/${fileName}`
+  return `${process.env.CLOUDFLARE_R2_PUBLIC_URL}/${fileName}`
 }
