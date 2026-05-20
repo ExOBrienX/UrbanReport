@@ -10,7 +10,7 @@ import 'leaflet.markercluster/dist/MarkerCluster.css'
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css'
 // @ts-ignore
 import 'leaflet/dist/leaflet.css'
-import ReportModal from '../ui/ReportModal'
+import ReportModal from '../ui/Ciudadano/ReportModal'
 import ClusterSheet from './ClusterSheet'
 import MapControls from './MapControls'
 import { useCityMap, ReporteConCalle } from '../../lib/hooks/useCityMap'
