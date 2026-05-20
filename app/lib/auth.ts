@@ -12,41 +12,43 @@ export const authOptions: NextAuthOptions = {
         password: { label: 'Password', type: 'password' }
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
-          return null
-        }
+        if (!credentials?.email || !credentials?.password) return null
+
         const user = await prisma.usuario.findUnique({
           where: { email: credentials.email }
         })
-        if (!user) {
-          return null
-        }
+
+        if (!user || !user.activo) return null
+
         const isPasswordValid = await bcrypt.compare(credentials.password, user.password_hash)
-        if (!isPasswordValid) {
-          return null
-        }
+        if (!isPasswordValid) return null
+
         return {
           id: user.id.toString(),
           email: user.email,
-          rol: user.rol
+          nombre: user.nombre,
+          rol: user.rol as 'admin' | 'tecnico'
         }
       }
     })
   ],
   session: {
-    strategy: 'jwt'
+    strategy: 'jwt',
+    maxAge: 8 * 60 * 60,
   },
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        token.role = user.rol
+        token.role = user.rol as 'admin' | 'tecnico'
+        token.nombre = user.nombre as string
       }
       return token
     },
     async session({ session, token }) {
       if (token && session.user) {
         session.user.id = token.sub!
-        session.user.role = token.role
+        session.user.role = token.role as 'admin' | 'tecnico'
+        session.user.nombre = token.nombre as string
       }
       return session
     }

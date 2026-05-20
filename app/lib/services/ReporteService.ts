@@ -8,20 +8,20 @@ export class ReporteService {
     descripcion: string,
     latitud: number,
     longitud: number,
-    categoriaId: number
+    fotoUrl?: string // Opcional: si ya subiste la foto antes, pasa la URL directamente
   ) {
-    // Subir foto a Cloudflare R2
-    const fotoUrl = await uploadPhoto(foto)
+    // Subir foto a Cloudflare R2 (solo si no se pasó una URL ya procesada)
+    const urlFinal = fotoUrl ?? await uploadPhoto(foto)
 
     // Guardar reporte en MySQL con estado inicial pendiente_revision
+    // categoria_ia_id y resumen_ia se actualizan después con el resultado de la IA
     const reporte = await prisma.reporte.create({
       data: {
         descripcion,
-        foto_url: fotoUrl,
+        foto_url: urlFinal,
         latitud,
         longitud,
         estado: 'pendiente_revision',
-        categoria_ia_id: categoriaId,
       },
     })
 
@@ -46,6 +46,7 @@ export class ReporteService {
         categoria_ia_id: true,
         resumen_ia: true,
         incidencia_id: true,
+        confianza_ia: true,
       }
     })
 

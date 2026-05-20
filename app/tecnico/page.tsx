@@ -4,11 +4,10 @@ import { useSession, signOut } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
 
-export default function AdminPage() {
+export default function TecnicoPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
 
-  // Doble verificación client-side (el middleware ya protege, esto es por si acaso)
   useEffect(() => {
     if (status === 'unauthenticated') router.push('/acceso')
   }, [status, router])
@@ -29,7 +28,7 @@ export default function AdminPage() {
         </div>
         <div>
           <p className="text-xs text-slate-500 uppercase tracking-wide">Panel</p>
-          <h1 className="text-2xl font-semibold text-slate-900">Administrador</h1>
+          <h1 className="text-2xl font-semibold text-slate-900">Técnico</h1>
         </div>
         <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4 text-left space-y-1">
           <p className="text-sm text-slate-700">
@@ -43,7 +42,7 @@ export default function AdminPage() {
           </p>
         </div>
         <p className="text-xs text-slate-400">
-          Etapa 4 en construcción — panel completo próximamente
+          Etapa 4 en construcción — cola de tareas próximamente
         </p>
         <button
           onClick={() => signOut({ callbackUrl: '/acceso' })}
