@@ -40,7 +40,17 @@ export default function CityMap({ onThemeChange }: CityMapProps) {
   })
 
   useEffect(() => {
-    const mapInstance = L.map('map').setView([-35.4264, -71.6554], 13)
+    const TALCA_BOUNDS = L.latLngBounds(
+  L.latLng(-35.52, -71.75), // suroeste
+  L.latLng(-35.35, -71.58)  // noreste
+)
+
+const mapInstance = L.map('map', {
+  minZoom: 13,
+  maxBounds: TALCA_BOUNDS,
+  maxBoundsViscosity: 1.0
+}).setView([-35.4264, -71.6554], 13)
+
     setMap(mapInstance)
 
     return () => {
