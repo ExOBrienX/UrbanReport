@@ -40,6 +40,13 @@ export async function POST(request: NextRequest) {
       const r = ResponseFactory.validacion('Coordenadas inválidas')
       return NextResponse.json(r.body, { status: r.status })
     }
+    // Validar que las coordenadas estén dentro de Talca
+const TALCA_BOUNDS = { latMin: -35.52, latMax: -35.35, lonMin: -71.75, lonMax: -71.58 }
+if (lat < TALCA_BOUNDS.latMin || lat > TALCA_BOUNDS.latMax ||
+    lon < TALCA_BOUNDS.lonMin || lon > TALCA_BOUNDS.lonMax) {
+  const r = ResponseFactory.validacion('Solo se aceptan reportes dentro de la ciudad de Talca')
+  return NextResponse.json(r.body, { status: r.status })
+}
 
     // ── Validación: descripción ───────────────────────────────────────────────
     const descripcionLimpia = descripcion.trim()

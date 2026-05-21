@@ -214,7 +214,7 @@ export default function ReportModal({ isOpen, onClose }: ReportModalProps) {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4 overflow-y-auto p-4 md:max-h-[32rem]">
+        <form onSubmit={handleSubmit} className="space-y-4 overflow-y-auto p-4 max-h-[65vh]">
           {/* Ubicación */}
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
             <p className="text-sm font-medium text-slate-700">📍 Ubicación</p>

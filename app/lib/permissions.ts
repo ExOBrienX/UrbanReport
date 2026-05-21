@@ -50,7 +50,8 @@ export async function requestCameraPermission(): Promise<MediaStream> {
   }
 
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+    const stream = await navigator.mediaDevices.getUserMedia({ 
+  video: { facingMode: { ideal: 'environment' } }});
     return stream;
   } catch (error: unknown) {
     if (error instanceof DOMException) {
