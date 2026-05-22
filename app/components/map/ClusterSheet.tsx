@@ -9,6 +9,9 @@ interface Reporte {
   descripcion: string
   calle?: string
   creado_en: string
+  incidencia?: {
+    estado: string
+  } | null
 }
 
 interface ClusterSheetProps {
@@ -34,56 +37,59 @@ export default function ClusterSheet({ isOpen, reportes, onClose }: ClusterSheet
           <h2 className="text-base font-semibold text-slate-900">
             {reportes.length} incidencias en este sector
           </h2>
-          <button
-            onClick={onClose}
-            className="text-slate-500 hover:text-slate-700 text-xl"
-          >
+          <button onClick={onClose} className="text-slate-500 hover:text-slate-700 text-xl">
             ✕
           </button>
         </div>
 
         {/* Lista con scroll */}
         <div className="overflow-y-auto flex-1 divide-y divide-slate-100">
-          {reportes.map((reporte, index) => (
-            <div key={reporte.id ?? index} className="flex gap-3 p-4 items-start">
-              {/* Número */}
-              <div
-                className="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold mt-1"
-                style={{ background: getColor(reporte.estado) }}
-              >
-                {index + 1}
-              </div>
+          {reportes.map((reporte, index) => {
+            const estadoReal = reporte.incidencia?.estado ?? reporte.estado
+            const color = getColor(estadoReal)
+            const label = getEstadoLabel(estadoReal)
 
-              {/* Foto */}
-              <img
-                src={reporte.foto_url}
-                alt="Foto del reporte"
-                className="w-20 h-20 rounded-lg object-cover flex-shrink-0 bg-slate-100"
-              />
-
-              {/* Datos */}
-              <div className="flex flex-col gap-1 min-w-0 flex-1">
-                <span
-                  className="text-xs font-semibold px-2 py-0.5 rounded-full w-fit"
-                  style={{
-                    background: getColor(reporte.estado) + '22',
-                    color: getColor(reporte.estado)
-                  }}
+            return (
+              <div key={reporte.id ?? index} className="flex gap-3 p-4 items-start">
+                {/* Número */}
+                <div
+                  className="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold mt-1"
+                  style={{ background: color }}
                 >
-                  {getEstadoLabel(reporte.estado)}
-                </span>
-                <p className="text-xs text-slate-500 font-medium">
-                  📍 {reporte.calle ?? 'Dirección no disponible'}
-                </p>
-                <p className="text-sm text-slate-700 line-clamp-2">
-                  {reporte.descripcion}
-                </p>
-                <p className="text-xs text-slate-400">
-                  {getRelativeTime(reporte.creado_en)}
-                </p>
+                  {index + 1}
+                </div>
+
+                {/* Foto */}
+                <img
+                  src={reporte.foto_url}
+                  alt="Foto del reporte"
+                  className="w-20 h-20 rounded-lg object-cover flex-shrink-0 bg-slate-100"
+                />
+
+                {/* Datos */}
+                <div className="flex flex-col gap-1 min-w-0 flex-1">
+                  <span
+                    className="text-xs font-semibold px-2 py-0.5 rounded-full w-fit"
+                    style={{
+                      background: color + '22',
+                      color: color
+                    }}
+                  >
+                    {label}
+                  </span>
+                  <p className="text-xs text-slate-500 font-medium">
+                    📍 {reporte.calle ?? 'Dirección no disponible'}
+                  </p>
+                  <p className="text-sm text-slate-700 line-clamp-2">
+                    {reporte.descripcion}
+                  </p>
+                  <p className="text-xs text-slate-400">
+                    {getRelativeTime(reporte.creado_en)}
+                  </p>
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       </div>
     </div>
