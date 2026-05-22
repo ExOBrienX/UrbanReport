@@ -92,7 +92,7 @@ model Incidencia {
 model Tarea {
   id                    Int              @id @default(autoincrement())
   incidencia_id         Int
-  tecnico_id            Int
+  tecnico_id            Int?
   estado                TareaEstado      @default(asignada)
   motivo_atraso         MotivoAtraso?
   motivo_cancelacion    String?          @db.Text
@@ -103,7 +103,7 @@ model Tarea {
   completada_en         DateTime?
 
   incidencia            Incidencia       @relation(fields: [incidencia_id], references: [id])
-  tecnico               Usuario          @relation("TecnicoTareas", fields: [tecnico_id], references: [id])
+  tecnico               Usuario?          @relation("TecnicoTareas", fields: [tecnico_id], references: [id])
   cancelada_por         Usuario?         @relation("AdminCancelaciones", fields: [cancelada_por_id], references: [id])
   historial             HistorialEstado[]
 

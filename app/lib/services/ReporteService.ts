@@ -29,27 +29,30 @@ export class ReporteService {
   }
 
   static async obtenerActivos() {
-    const reportes = await prisma.reporte.findMany({
-      where: {
-        estado: {
-          not: 'descartado'
+  const reportes = await prisma.reporte.findMany({
+    where: {
+      estado: { not: 'descartado' }
+    },
+    select: {
+      id: true,
+      latitud: true,
+      longitud: true,
+      estado: true,
+      descripcion: true,
+      foto_url: true,
+      creado_en: true,
+      categoria_ia_id: true,
+      resumen_ia: true,
+      incidencia_id: true,
+      confianza_ia: true,
+      incidencia: {         // Incluir estado de la incidencia relacionada para mostrar en el mapa
+        select: {
+          estado: true
         }
-      },
-      select: {
-        id: true,
-        latitud: true,
-        longitud: true,
-        estado: true,
-        descripcion: true,
-        foto_url: true,
-        creado_en: true,
-        categoria_ia_id: true,
-        resumen_ia: true,
-        incidencia_id: true,
-        confianza_ia: true,
       }
-    })
+    }
+  })
 
-    return reportes
-  }
+  return reportes
+}
 }

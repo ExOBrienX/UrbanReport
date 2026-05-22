@@ -13,6 +13,9 @@ export interface Reporte {
   descripcion: string
   foto_url: string
   creado_en: string
+  incidencia?: {           // ← agregar esto
+    estado: string
+  } | null
 }
 
 export interface ReporteConCalle extends Reporte {
@@ -55,7 +58,7 @@ export function useCityMap({ map, onClusterOpen }: UseCityMapOptions): UseCityMa
       removeNumberedMarkers()
 
       reportes.forEach((reporte, index) => {
-        const color = getColor(reporte.estado)
+        const color = getColor(reporte.incidencia?.estado ?? reporte.estado)
         const icon = L.divIcon({
           html: `<div style="
             background:${color};color:white;border-radius:50%;
@@ -159,7 +162,7 @@ export function useCityMap({ map, onClusterOpen }: UseCityMapOptions): UseCityMa
       })
 
       data.reportes.forEach((reporte: Reporte) => {
-        const color = getColor(reporte.estado)
+        const color = getColor(reporte.incidencia?.estado ?? reporte.estado)
         const marker = L.circleMarker([parseFloat(reporte.latitud), parseFloat(reporte.longitud)], {
           radius: 10,
           fillColor: color,
@@ -192,7 +195,7 @@ export function useCityMap({ map, onClusterOpen }: UseCityMapOptions): UseCityMa
                     <span style="
                       display:inline-block;background:${color};color:white;
                       padding:4px 10px;border-radius:4px;font-weight:bold;font-size:11px
-                    ">${getEstadoLabel(reporte.estado)}</span>
+                    ">${getEstadoLabel(reporte.incidencia?.estado ?? reporte.estado)}</span>
                   </div>
                   <p style="margin:6px 0;font-weight:600;color:#333;">📍 ${calle}</p>
                   <p style="margin:6px 0;color:#555;line-height:1.4;">${reporte.descripcion}</p>
