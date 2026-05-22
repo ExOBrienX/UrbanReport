@@ -38,12 +38,12 @@ export class IncidenciaService {
 
     // Crear tarea sin tecnico_id — visible para todos con esa especialidad
     const tarea = await prisma.tarea.create({
-      data: {
-        incidencia_id: incidenciaId,
-        estado: 'asignada'
-        // tecnico_id omitido intencionalmente — se asigna cuando alguien acepta
-      }
-    })
+  data: {
+    incidencia_id: incidenciaId,
+    tecnico_id: null,  // ← agregar esta línea
+    estado: 'asignada'
+  }
+})
 
     console.log('✅ Tarea creada:', tarea.id, '| Para especialidad categoría:', categoriaId)
     return tarea
