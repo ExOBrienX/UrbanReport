@@ -36,7 +36,7 @@ export async function GET() {
         OR: [
           // Tareas disponibles de su especialidad
           {
-            tecnico_id: null,
+            tecnico_id: { equals: null },
             estado: 'asignada',
             incidencia: {
               categoria_id: { in: categoriaIds },
