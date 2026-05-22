@@ -1,10 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '../../lib/auth'
 import { prisma } from '../../lib/prisma'
 
 // GET /api/tasks — cola de tareas para el técnico autenticado
-// Devuelve tareas sin tecnico_id (disponibles) y tareas propias activas
 export async function GET() {
   const session = await getServerSession(authOptions)
 
@@ -18,7 +17,6 @@ export async function GET() {
   const tecnicoId = parseInt(session.user.id)
 
   try {
-    // Obtener categorías del técnico (sus especialidades)
     const especialidades = await prisma.especialidad.findMany({
       where: { usuario_id: tecnicoId },
       select: { categoria_id: true }
@@ -29,14 +27,13 @@ export async function GET() {
       return NextResponse.json({ success: true, tareas: [] }, { status: 200 })
     }
 
-    // Tareas disponibles (sin tecnico asignado) de su especialidad
-    // + sus propias tareas activas
-    const tareas = await prisma.tarea.findMany({
+    // Traer todas las tareas candidatas y filtrar en memoria
+    // para evitar el problema de tipo con tecnico_id: null en Prisma
+    const todasTareas = await prisma.tarea.findMany({
       where: {
         OR: [
-          // Tareas disponibles de su especialidad
+          // Tareas asignadas de la especialidad del técnico (sin importar tecnico_id aún)
           {
-            tecnico_id: { equals: null },
             estado: 'asignada',
             incidencia: {
               categoria_id: { in: categoriaIds },
@@ -73,6 +70,11 @@ export async function GET() {
         }
       }
     })
+
+    // Filtrar en memoria: solo tareas sin técnico asignado + las propias activas
+    const tareas = todasTareas.filter(t =>
+      t.tecnico_id === null || t.tecnico_id === tecnicoId
+    )
 
     return NextResponse.json({ success: true, tareas }, { status: 200 })
   } catch (error) {
