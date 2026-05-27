@@ -1,9 +1,30 @@
+/**
+ * app/api/tasks/[id]/route.ts — Gestión de estado y evidencia de una tarea.
+ * Solo accesible para usuarios con rol 'tecnico'.
+ * Delega toda la lógica de negocio a TareaService (patrón Repository).
+ *
+ * PATCH /api/tasks/[id] — Cambia el estado según la acción enviada
+ * POST  /api/tasks/[id] — Sube foto de evidencia y completa la tarea
+ */
+
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '../../../lib/auth'
-import { prisma } from '../../../lib/prisma'
-import { PriorityService } from '../../../lib/services/PriorityService'
-import { uploadEvidencia } from '../../../lib/uploadEvidencia'
+import { TareaService } from '../../../lib/services/TareaService'
+
+// Mapa de errores del servicio a mensajes y códigos HTTP para el cliente
+const ERRORES: Record<string, { mensaje: string; status: number }> = {
+  TAREA_NO_ENCONTRADA:     { mensaje: 'Tarea no encontrada', status: 404 },
+  SIN_PERMISO:             { mensaje: 'No tienes permiso sobre esta tarea', status: 403 },
+  TAREA_YA_ACEPTADA:       { mensaje: 'La tarea ya fue aceptada', status: 400 },
+  YA_TIENE_TAREA_ACTIVA:   { mensaje: 'Ya tienes una tarea activa', status: 400 },
+  DEBE_ACEPTAR_PRIMERO:    { mensaje: 'Debes aceptar la tarea primero', status: 400 },
+  ESTADO_INVALIDO_ATRASO:  { mensaje: 'Solo puedes reportar atraso en tareas activas', status: 400 },
+  MOTIVO_ATRASO_INVALIDO:  { mensaje: 'Debes seleccionar un motivo de atraso válido', status: 400 },
+  ESTADO_INVALIDO_COMPLETAR: { mensaje: 'No puedes completar esta tarea en su estado actual', status: 400 },
+  ACCION_INVALIDA:         { mensaje: 'Acción no reconocida', status: 400 },
+  FOTO_DEMASIADO_GRANDE:   { mensaje: 'La foto no puede superar 8MB', status: 400 },
+}
 
 // PATCH /api/tasks/[id] — cambiar estado de una tarea
 export async function PATCH(
@@ -25,126 +46,27 @@ export async function PATCH(
   const body = await request.json()
   const { accion, motivo_atraso } = body
 
+  // Validar acción antes de llamar al servicio
   const acciones = ['aceptar', 'iniciar', 'atraso', 'completar']
   if (!accion || !acciones.includes(accion)) {
     return NextResponse.json({ error: 'Acción inválida' }, { status: 400 })
   }
 
   try {
-    const tarea = await prisma.tarea.findUnique({
-      where: { id: tareaId },
-      include: { incidencia: true }
-    })
+    // Delegar toda la lógica de negocio al TareaService
+    const tarea = await TareaService.cambiarEstado(tareaId, tecnicoId, accion, motivo_atraso)
+    return NextResponse.json({ success: true, tarea }, { status: 200 })
+  } catch (error: any) {
+    // Traducir errores semánticos del servicio a respuestas HTTP
+    const err = ERRORES[error.message]
+    if (err) return NextResponse.json({ error: err.mensaje }, { status: err.status })
 
-    if (!tarea) {
-      return NextResponse.json({ error: 'Tarea no encontrada' }, { status: 404 })
-    }
-
-    // Verificar que la tarea le pertenece o está disponible
-    if (accion !== 'aceptar' && tarea.tecnico_id !== tecnicoId) {
-      return NextResponse.json({ error: 'No tienes permiso sobre esta tarea' }, { status: 403 })
-    }
-
-    let nuevoEstadoTarea: string
-    let nuevoEstadoIncidencia: string
-    let datosExtra: Record<string, unknown> = {}
-
-    switch (accion) {
-      case 'aceptar':
-        if (tarea.estado !== 'asignada') {
-          return NextResponse.json({ error: 'La tarea ya fue aceptada' }, { status: 400 })
-        }
-        // Verificar que no tenga otra tarea activa
-        const tareaActiva = await prisma.tarea.findFirst({
-          where: {
-            tecnico_id: tecnicoId,
-            estado: { in: ['aceptada', 'en_curso', 'atrasada'] }
-          }
-        })
-        if (tareaActiva) {
-          return NextResponse.json({ error: 'Ya tienes una tarea activa' }, { status: 400 })
-        }
-        nuevoEstadoTarea = 'aceptada'
-        nuevoEstadoIncidencia = 'asignado'
-        datosExtra = { tecnico_id: tecnicoId }
-        break
-
-      case 'iniciar':
-        if (tarea.estado !== 'aceptada') {
-          return NextResponse.json({ error: 'Debes aceptar la tarea primero' }, { status: 400 })
-        }
-        nuevoEstadoTarea = 'en_curso'
-        nuevoEstadoIncidencia = 'en_curso'
-        break
-
-      case 'atraso':
-        if (!['en_curso', 'aceptada'].includes(tarea.estado)) {
-          return NextResponse.json({ error: 'Solo puedes reportar atraso en tareas activas' }, { status: 400 })
-        }
-        const motivosValidos = ['materiales', 'complejidad', 'clima', 'otro']
-        if (!motivo_atraso || !motivosValidos.includes(motivo_atraso)) {
-          return NextResponse.json({ error: 'Debes seleccionar un motivo de atraso válido' }, { status: 400 })
-        }
-        nuevoEstadoTarea = 'atrasada'
-        nuevoEstadoIncidencia = 'en_curso'
-        datosExtra = { motivo_atraso }
-        break
-
-      case 'completar':
-        if (!['en_curso', 'atrasada', 'aceptada'].includes(tarea.estado)) {
-          return NextResponse.json({ error: 'No puedes completar esta tarea en su estado actual' }, { status: 400 })
-        }
-        nuevoEstadoTarea = 'completada'
-        nuevoEstadoIncidencia = 'completado'
-        datosExtra = { completada_en: new Date() }
-        break
-
-      default:
-        return NextResponse.json({ error: 'Acción no reconocida' }, { status: 400 })
-    }
-
-    // Actualizar tarea
-    const tareaActualizada = await prisma.tarea.update({
-      where: { id: tareaId },
-      data: {
-        estado: nuevoEstadoTarea as any,
-        ...datosExtra
-      }
-    })
-
-    // Actualizar incidencia
-    await prisma.incidencia.update({
-      where: { id: tarea.incidencia_id },
-      data: { estado: nuevoEstadoIncidencia as any }
-    })
-
-    // Registrar en historial
-    await prisma.historialEstado.create({
-      data: {
-        tarea_id: tareaId,
-        estado_anterior: tarea.estado as any,
-        estado_nuevo: nuevoEstadoTarea as any,
-        cambiado_por_id: tecnicoId
-      }
-    })
-
-    // Recalcular prioridad
-    await PriorityService.recalcularPrioridad(tarea.incidencia_id)
-
-    console.log(`✅ Tarea ${tareaId}: ${tarea.estado} → ${nuevoEstadoTarea}`)
-
-    return NextResponse.json({
-      success: true,
-      tarea: tareaActualizada
-    }, { status: 200 })
-
-  } catch (error) {
     console.error('Error actualizando tarea:', error)
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
   }
 }
 
-// POST /api/tasks/[id] — subir foto de evidencia al completar
+// POST /api/tasks/[id] — subir foto de evidencia y completar la tarea
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -162,76 +84,27 @@ export async function POST(
   const { id } = await params
   const tareaId = parseInt(id)
 
+  const formData = await request.formData()
+  const foto = formData.get('foto') as File | null
+
+  if (!foto) {
+    return NextResponse.json({ error: 'La foto de evidencia es obligatoria' }, { status: 400 })
+  }
+
+  // Validar tipo de archivo antes de llamar al servicio
+  const tiposPermitidos = ['image/jpeg', 'image/png', 'image/webp']
+  if (!tiposPermitidos.includes(foto.type)) {
+    return NextResponse.json({ error: 'Solo se permiten imágenes JPG, PNG o WebP' }, { status: 400 })
+  }
+
   try {
-    const tarea = await prisma.tarea.findUnique({ where: { id: tareaId } })
+    // Delegar la lógica de completar con evidencia al TareaService
+    const { tarea, fotoUrl } = await TareaService.completarConEvidencia(tareaId, tecnicoId, foto)
+    return NextResponse.json({ success: true, tarea, foto_url: fotoUrl }, { status: 200 })
+  } catch (error: any) {
+    const err = ERRORES[error.message]
+    if (err) return NextResponse.json({ error: err.mensaje }, { status: err.status })
 
-    if (!tarea) {
-      return NextResponse.json({ error: 'Tarea no encontrada' }, { status: 404 })
-    }
-    if (tarea.tecnico_id !== tecnicoId) {
-      return NextResponse.json({ error: 'No tienes permiso sobre esta tarea' }, { status: 403 })
-    }
-
-    const formData = await request.formData()
-    const foto = formData.get('foto') as File | null
-
-    if (!foto) {
-      return NextResponse.json({ error: 'La foto de evidencia es obligatoria' }, { status: 400 })
-    }
-
-    // Validar tipo y tamaño
-    const tiposPermitidos = ['image/jpeg', 'image/png', 'image/webp']
-    if (!tiposPermitidos.includes(foto.type)) {
-      return NextResponse.json({ error: 'Solo se permiten imágenes JPG, PNG o WebP' }, { status: 400 })
-    }
-
-    const arrayBuffer = await foto.arrayBuffer()
-    const buffer = Buffer.from(arrayBuffer)
-
-    if (buffer.length > 8 * 1024 * 1024) {
-      return NextResponse.json({ error: 'La foto no puede superar 8MB' }, { status: 400 })
-    }
-
-    const fotoParaSubir = new File([buffer], foto.name || 'evidencia.jpg', { type: foto.type })
-    const fotoUrl = await uploadEvidencia(fotoParaSubir)
-
-    // Actualizar tarea con foto y marcar como completada
-    const tareaActualizada = await prisma.tarea.update({
-      where: { id: tareaId },
-      data: {
-        foto_evidencia_url: fotoUrl,
-        estado: 'completada',
-        completada_en: new Date()
-      }
-    })
-
-    // Actualizar incidencia a completado
-    await prisma.incidencia.update({
-      where: { id: tarea.incidencia_id },
-      data: { estado: 'completado' }
-    })
-
-    // Registrar en historial
-    await prisma.historialEstado.create({
-      data: {
-        tarea_id: tareaId,
-        estado_anterior: tarea.estado as any,
-        estado_nuevo: 'completada',
-        cambiado_por_id: tecnicoId
-      }
-    })
-
-    await PriorityService.recalcularPrioridad(tarea.incidencia_id)
-
-    console.log(`✅ Tarea ${tareaId} completada con evidencia`)
-
-    return NextResponse.json({
-      success: true,
-      tarea: tareaActualizada,
-      foto_url: fotoUrl
-    }, { status: 200 })
-
-  } catch (error) {
     console.error('Error subiendo evidencia:', error)
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
   }

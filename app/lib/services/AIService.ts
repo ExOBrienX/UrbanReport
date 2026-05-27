@@ -1,30 +1,51 @@
+/**
+ * AIService.ts — Servicio de clasificación de reportes con Inteligencia Artificial
+ * Usa Claude Haiku 4.5 (Anthropic) para analizar imagen + descripción del ciudadano.
+ * Patrón: Service — encapsula toda la lógica de comunicación con la API de Anthropic.
+ * Usado por: app/api/reports/route.ts
+ */
+
 import Anthropic from '@anthropic-ai/sdk'
 import { prisma } from '../prisma'
 
+// Cliente de Anthropic — se inicializa con la API key del archivo .env
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
+/**
+ * Estructura del resultado que devuelve la IA al analizar un reporte.
+ * Esta interfaz es importada por ResponseFactory.ts y route.ts.
+ */
 export interface ResultadoIA {
-  accion: 'aprobar' | 'revision' | 'rechazar'
-  categoria: string | null
-  confianza: number
-  resumen_tecnico: string
-  requiere_revision: boolean
-  motivo?: string
+  accion: 'aprobar' | 'revision' | 'rechazar' // decisión principal de la IA
+  categoria: string | null    // categoría municipal detectada, o null si no aplica
+  confianza: number           // nivel de certeza de la IA (0-100)
+  resumen_tecnico: string     // descripción técnica para el técnico que atenderá
+  requiere_revision: boolean  // true si debe pasar por revisión del admin
+  motivo?: string             // mensaje legible para el ciudadano (solo en rechazo/revisión)
 }
 
+// Categorías municipales válidas — deben coincidir exactamente con la tabla 'categorias' en BD
 const CATEGORIAS_VALIDAS = [
   'Pavimento', 'Veredas', 'Areas Verdes', 'Senaletica', 'Residuos', 'Mobiliario'
 ]
+
+// Umbral de confianza por defecto si no se puede leer desde la BD
 const CONFIANZA_UMBRAL_DEFAULT = 60
 
 export class AIService {
 
-  // Lee el umbral desde configuracion_sistema, con fallback al valor hardcodeado
+  /**
+   * Lee el umbral mínimo de confianza desde la tabla 'configuracion_sistema' en BD.
+   * Esto permite al administrador ajustarlo sin modificar el código.
+   * Si falla la lectura (BD no disponible, clave no existe), usa el valor por defecto.
+   */
   static async getConfianzaUmbral(): Promise<number> {
     try {
+      // Busca la fila con clave 'umbral_confianza_ia' en configuracion_sistema
       const config = await prisma.configuracionSistema.findUnique({
         where: { clave: 'umbral_confianza_ia' }
       })
+      // Si existe, convierte el valor string a número entero
       if (config) return parseInt(config.valor, 10)
     } catch {
       console.warn('⚠️ No se pudo leer umbral_confianza_ia desde BD, usando default:', CONFIANZA_UMBRAL_DEFAULT)
@@ -32,15 +53,29 @@ export class AIService {
     return CONFIANZA_UMBRAL_DEFAULT
   }
 
+  /**
+   * Analiza un reporte ciudadano usando Claude Haiku 4.5.
+   * Recibe la imagen en base64 y la descripción textual del ciudadano.
+   * Devuelve un ResultadoIA con la decisión y datos del análisis.
+   *
+   * @param imagenBase64 - Foto del problema en formato base64 (con o sin prefijo data:image/...)
+   * @param descripcion  - Texto descriptivo del ciudadano sobre el problema
+   */
   static async clasificarReporte(imagenBase64: string, descripcion: string): Promise<ResultadoIA> {
+
+    // Extraer solo los datos base64 puros, eliminando el prefijo "data:image/jpeg;base64,"
+    // que el navegador agrega al convertir una imagen a base64
     const imageData = imagenBase64.includes('base64,')
       ? imagenBase64.split('base64,')[1]
       : imagenBase64
 
+    // Detectar el tipo de imagen desde el prefijo para enviarlo correctamente a la API
     const mediaType = imagenBase64.startsWith('data:image/png') ? 'image/png'
       : imagenBase64.startsWith('data:image/webp') ? 'image/webp'
-      : 'image/jpeg'
+      : 'image/jpeg' // jpeg por defecto (canvas del navegador siempre genera jpeg)
 
+    // Prompt que instruye a Claude cómo analizar el reporte
+    // Usa 4 reglas en orden estricto para garantizar coherencia en las decisiones
     const prompt = `Eres un sistema de clasificación de incidencias urbanas municipales de la ciudad de Talca, Chile.
 
 Analiza la imagen y la descripción del ciudadano siguiendo estas reglas en orden estricto:
@@ -82,9 +117,11 @@ Responde ÚNICAMENTE con un objeto JSON válido, sin bloques de código markdown
   "motivo": "mensaje para el ciudadano, omitir si accion es aprobar"
 }`
 
+    // Llamada a la API de Anthropic con la imagen y el prompt
+    // El modelo recibe tanto la imagen como el texto en el mismo mensaje
     const response = await client.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 500,
+      model: 'claude-haiku-4-5-20251001', // modelo rápido y económico de Anthropic
+      max_tokens: 500,                     // suficiente para el JSON de respuesta
       messages: [{
         role: 'user',
         content: [
@@ -97,18 +134,22 @@ Responde ÚNICAMENTE con un objeto JSON válido, sin bloques de código markdown
       }]
     })
 
+    // Extraer el bloque de texto de la respuesta (puede haber múltiples bloques)
     const textContent = response.content.find(c => c.type === 'text')
     if (!textContent || textContent.type !== 'text') {
       throw new Error('No se recibió respuesta de texto de la IA')
     }
 
+    // Limpiar posibles bloques ```json ... ``` que el modelo puede agregar
+    // aunque el prompt pide explícitamente no incluirlos
     const rawText = textContent.text.trim()
     const cleanJson = rawText
-      .replace(/^```json\s*/i, '')
-      .replace(/^```\s*/i, '')
-      .replace(/\s*```$/i, '')
+      .replace(/^```json\s*/i, '') // elimina ```json al inicio
+      .replace(/^```\s*/i, '')     // elimina ``` al inicio
+      .replace(/\s*```$/i, '')     // elimina ``` al final
       .trim()
 
+    // Parsear el JSON — si falla, lanzar error con el texto recibido para debug
     let resultado: ResultadoIA
     try {
       resultado = JSON.parse(cleanJson) as ResultadoIA
@@ -117,9 +158,11 @@ Responde ÚNICAMENTE con un objeto JSON válido, sin bloques de código markdown
       throw new Error(`Respuesta de IA no es JSON válido: ${rawText.slice(0, 200)}`)
     }
 
+    // Normalizar confianza al rango [0, 100] por si la IA devuelve valores fuera de rango
     resultado.confianza = Math.min(100, Math.max(0, Number(resultado.confianza) || 0))
 
-    // Sanidad: categoría fuera del listado válido → rechazar
+    // Verificación de sanidad: si la categoría no está en el listado válido,
+    // forzar rechazo para evitar que se creen incidencias con categorías inexistentes en BD
     if (resultado.categoria && !CATEGORIAS_VALIDAS.includes(resultado.categoria)) {
       console.warn(`⚠️ Categoría inválida de IA: "${resultado.categoria}"`)
       resultado.accion = 'rechazar'
@@ -129,7 +172,8 @@ Responde ÚNICAMENTE con un objeto JSON válido, sin bloques de código markdown
       resultado.motivo = 'La categoría detectada no corresponde a ninguna categoría municipal válida.'
     }
 
-    // Sanidad: rechazar siempre implica confianza 0 y categoria null
+    // Verificación de sanidad: si la acción es rechazar, asegurar que
+    // confianza y categoria queden en valores consistentes
     if (resultado.accion === 'rechazar') {
       resultado.confianza = 0
       resultado.categoria = null
