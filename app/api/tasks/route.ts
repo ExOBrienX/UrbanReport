@@ -8,7 +8,7 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '../../lib/auth'
-import { TareaService } from '../../lib/services/Tareaservice'
+import { TareaService } from '../../lib/services/TareaService'
 
 // GET /api/tasks — cola de tareas para el técnico autenticado
 export async function GET() {

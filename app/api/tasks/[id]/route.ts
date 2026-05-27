@@ -10,7 +10,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '../../../lib/auth'
-import { TareaService } from '../../../lib/services/Tareaservice'
+import { TareaService } from '../../../lib/services/TareaService'
 
 // Mapa de errores del servicio a mensajes y códigos HTTP para el cliente
 const ERRORES: Record<string, { mensaje: string; status: number }> = {
