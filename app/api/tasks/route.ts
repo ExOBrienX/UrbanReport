@@ -1,7 +1,14 @@
+/**
+ * app/api/tasks/route.ts — Cola de tareas del técnico autenticado.
+ * Solo accesible para usuarios con rol 'tecnico'.
+ * Delega la lógica de negocio a TareaService (patrón Repository).
+ * Usado por: app/tecnico/page.tsx al cargar el panel
+ */
+
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '../../lib/auth'
-import { prisma } from '../../lib/prisma'
+import { TareaService } from '../../lib/services/Tareaservice'
 
 // GET /api/tasks — cola de tareas para el técnico autenticado
 export async function GET() {
@@ -17,65 +24,8 @@ export async function GET() {
   const tecnicoId = parseInt(session.user.id)
 
   try {
-    const especialidades = await prisma.especialidad.findMany({
-      where: { usuario_id: tecnicoId },
-      select: { categoria_id: true }
-    })
-    const categoriaIds = especialidades.map(e => e.categoria_id)
-
-    if (categoriaIds.length === 0) {
-      return NextResponse.json({ success: true, tareas: [] }, { status: 200 })
-    }
-
-    // Traer todas las tareas candidatas y filtrar en memoria
-    // para evitar el problema de tipo con tecnico_id: null en Prisma
-    const todasTareas = await prisma.tarea.findMany({
-      where: {
-        OR: [
-          // Tareas asignadas de la especialidad del técnico (sin importar tecnico_id aún)
-          {
-            estado: 'asignada',
-            incidencia: {
-              categoria_id: { in: categoriaIds },
-              estado: { not: 'completado' }
-            }
-          },
-          // Sus propias tareas activas
-          {
-            tecnico_id: tecnicoId,
-            estado: { in: ['aceptada', 'en_curso', 'atrasada'] }
-          }
-        ]
-      },
-      include: {
-        incidencia: {
-          include: {
-            categoria: true,
-            reportes: {
-              take: 1,
-              orderBy: { creado_en: 'desc' },
-              select: {
-                foto_url: true,
-                descripcion: true,
-                resumen_ia: true,
-                creado_en: true
-              }
-            }
-          }
-        }
-      },
-      orderBy: {
-        incidencia: {
-          puntaje_prioridad: 'desc'
-        }
-      }
-    })
-
-    // Filtrar en memoria: solo tareas sin técnico asignado + las propias activas
-    const tareas = todasTareas.filter(t =>
-      t.tecnico_id === null || t.tecnico_id === tecnicoId
-    )
-
+    // Delegar la lógica de obtención de tareas al TareaService
+    const tareas = await TareaService.obtenerPorTecnico(tecnicoId)
     return NextResponse.json({ success: true, tareas }, { status: 200 })
   } catch (error) {
     console.error('Error obteniendo tareas:', error)
