@@ -1,10 +1,22 @@
+/* globals.css — Estilos globales de la aplicacion. */
+
+/*
+ * Importa Tailwind CSS v4 — incluye los estilos base, componentes y utilidades.
+ * En v4 se usa @import en vez del bloque @tailwind anterior.
+ */
 @import "tailwindcss";
 
+/* Variables CSS de color — usadas por Tailwind via @theme */
 :root {
   --background: #ffffff;
   --foreground: #171717;
 }
 
+/*
+ * @theme inline expone las variables como tokens de Tailwind.
+ * Permite usar bg-background, text-foreground y font-sans en clases Tailwind.
+ * Las fuentes vienen del layout.tsx via next/font/google.
+ */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -12,6 +24,7 @@
   --font-mono: var(--font-geist-mono);
 }
 
+/* Modo oscuro automatico segun preferencia del sistema operativo */
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;

@@ -1,18 +1,24 @@
 'use client'
 
 /**
- * app/admin/page.tsx — Panel de administración principal (SPA).
+ * app/admin/page.tsx — Panel de administracion principal (SPA).
  *
- * Vista de página única: el sidebar cambia la vista activa sin recargar la página.
- * Todas las vistas del admin se renderizan aquí según el estado vistaActiva.
+ * Vista de pagina unica: el sidebar cambia la vista activa sin recargar la pagina.
+ * Todas las vistas del admin se renderizan aqui segun el estado vistaActiva.
+ * El cambio de vista es instantaneo porque todos los componentes ya estan importados
+ * y solo se condiciona su renderizado con operadores &&.
  *
  * Vistas disponibles:
  *   - dashboard    : KPIs y mapa general (RF-22, RF-23)
- *   - bandeja      : Revisión y aprobación de reportes (RF-17, RF-18)
- *   - incidencias  : Gestión y cancelación de tareas (RF-19, RF-22)
- *   - tecnicos     : CRUD de técnicos y especialidades (RF-20)
- *   - informe      : Generación de informe mensual con IA (RF-24)
- *   - configuracion: Ajuste de parámetros del sistema (RF-25)
+ *   - bandeja      : Revision y aprobacion de reportes (RF-17, RF-18)
+ *   - incidencias  : Gestion y cancelacion de tareas (RF-19, RF-22)
+ *   - tecnicos     : CRUD de tecnicos y especialidades (RF-20)
+ *   - informe      : Generacion de informe mensual con IA (RF-24)
+ *   - configuracion: Ajuste de parametros del sistema (RF-25)
+ *
+ * Usado por: Next.js router — ruta /admin
+ * Depende de: AdminSidebar, BandejaRevision, GestionIncidencias,
+ *             GestionTecnicos, InformeMensual, Configuracion, AdminDashboard
  */
 
 import { useSession } from 'next-auth/react'

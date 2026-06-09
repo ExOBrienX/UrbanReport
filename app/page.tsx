@@ -1,25 +1,45 @@
-'use client' // Necesario para usar dynamic con ssr: false en Next.js 15
+'use client'
+
+/**
+ * app/page.tsx — Pagina principal del mapa ciudadano.
+ *
+ * Punto de entrada para los ciudadanos de Talca. Muestra el mapa interactivo
+ * de incidencias activas y permite crear nuevos reportes.
+ *
+ * CityMap se carga con dynamic import (ssr: false) porque Leaflet depende
+ * de window y document que no existen en el servidor. Sin esto, Next.js
+ * intentaria renderizar Leaflet en el servidor y lanzaria un error.
+ *
+ * El tema oscuro/claro del Header se sincroniza con el toggle del mapa
+ * via la prop onThemeChange — CityMap notifica cuando el admin cambia el
+ * tile layer para que el Header actualice sus colores.
+ *
+ * Depende de: Header, CityMap
+ */
 
 import { useState } from 'react'
 import dynamic from 'next/dynamic'
 import Header from './components/ui/Header'
 
-// Cargamos el mapa de forma dinámica solo en el cliente
-// ssr: false evita que Leaflet intente ejecutarse en el servidor,
-// ya que Leaflet depende de objetos del navegador como window y document
-// que no existen en el servidor
+// Carga dinamica del mapa — Leaflet requiere window y document (solo cliente)
 const CityMap = dynamic(() => import('./components/map/CityMap'), {
   ssr: false,
-  loading: () => <div className="flex items-center justify-center h-screen">Cargando mapa...</div> // Mensaje mientras carga el mapa
+  loading: () => (
+    <div className="flex items-center justify-center h-screen">
+      Cargando mapa...
+    </div>
+  )
 })
 
 export default function Home() {
-  const [isDarkMode, setIsDarkMode] = useState(true) // Inicia en modo oscuro
+  // Inicia en modo oscuro — sincronizado con el tile layer inicial de CityMap
+  const [isDarkMode, setIsDarkMode] = useState(true)
 
   return (
     <div className="min-h-screen">
       <Header isDarkMode={isDarkMode} />
-      <main className="pt-16"> {/* Espacio para el header fijo */}
+      {/* pt-16 compensa la altura del header fijo para que el mapa no quede tapado */}
+      <main className="pt-16">
         <CityMap onThemeChange={setIsDarkMode} />
       </main>
     </div>

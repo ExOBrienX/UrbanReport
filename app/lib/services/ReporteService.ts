@@ -46,36 +46,57 @@ export class ReporteService {
     return reporte
   }
 
-  /**
-   * Obtiene todos los reportes activos para mostrarlos en el mapa ciudadano.
-   * Excluye los reportes descartados (rechazados por IA o admin).
-   * Incluye el estado de la incidencia asociada para mostrar el color correcto en el mapa.
-   */
-  static async obtenerActivos() {
-    const reportes = await prisma.reporte.findMany({
-      where: {
-        estado: { not: 'descartado' }
-      },
-      select: {
-        id: true,
-        latitud: true,
-        longitud: true,
-        estado: true,
-        descripcion: true,
-        foto_url: true,
-        creado_en: true,
-        categoria_ia_id: true,
-        resumen_ia: true,
-        incidencia_id: true,
-        confianza_ia: true,
-        incidencia: {
-          select: { estado: true }
-        }
-      }
-    })
+ /**
+ * Obtiene todos los reportes activos para mostrarlos en el mapa ciudadano.
+ * Excluye los reportes descartados (rechazados por IA o admin).
+ * Excluye reportes cuya incidencia fue completada hace más de 48h (RF-08).
+ * Incluye el estado de la incidencia asociada para mostrar el color correcto en el mapa.
+ */
+static async obtenerActivos() {
+  const hace48h = new Date(Date.now() - 48 * 60 * 60 * 1000)
 
-    return reportes
-  }
+  const reportes = await prisma.reporte.findMany({
+    where: {
+      estado: { not: 'descartado' },
+      OR: [
+        // Sin incidencia — pendiente_revision, siempre visible
+        { incidencia_id: null },
+        // Incidencia no completada — siempre visible
+        { incidencia: { estado: { not: 'completado' } } },
+        // Incidencia completada hace MENOS de 48h — aún visible
+        {
+          incidencia: {
+            estado: 'completado',
+            tareas: {
+              some: {
+                estado: 'completada',
+                completada_en: { gte: hace48h }
+              }
+            }
+          }
+        }
+      ]
+    },
+    select: {
+      id: true,
+      latitud: true,
+      longitud: true,
+      estado: true,
+      descripcion: true,
+      foto_url: true,
+      creado_en: true,
+      categoria_ia_id: true,
+      resumen_ia: true,
+      incidencia_id: true,
+      confianza_ia: true,
+      incidencia: {
+        select: { estado: true }
+      }
+    }
+  })
+
+  return reportes
+}
 
   /**
    * Obtiene todos los reportes en estado 'pendiente_revision' para la bandeja del admin.

@@ -1,8 +1,17 @@
 /**
  * app/api/admin/tecnicos/[id]/especialidades/route.ts
- * POST — Asignar especialidad a un técnico.
- * DELETE — Quitar especialidad a un técnico.
+ * Gestion de especialidades de un tecnico especifico.
  * Solo accesible para usuarios con rol 'admin'.
+ * Delega la logica de negocio a UsuarioService (patron Repository).
+ *
+ * POST   /api/admin/tecnicos/[id]/especialidades — asignar una categoria al tecnico.
+ * DELETE /api/admin/tecnicos/[id]/especialidades — quitar una categoria del tecnico.
+ *
+ * Las especialidades determinan que categorias de incidencias puede ver
+ * y aceptar cada tecnico en su cola de tareas.
+ *
+ * Usado por: app/admin/components/GestionTecnicos.tsx (modal especialidades batch)
+ * Depende de: UsuarioService, NextAuth
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -10,13 +19,15 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '../../../../../lib/auth'
 import { UsuarioService } from '../../../../../lib/services/UsuarioService'
 
+// Traduccion de errores del servicio a mensajes legibles para el cliente
 const ERRORES: Record<string, { mensaje: string; status: number }> = {
-  TECNICO_NO_ENCONTRADO:    { mensaje: 'Técnico no encontrado', status: 404 },
-  CATEGORIA_NO_ENCONTRADA:  { mensaje: 'Categoría no encontrada', status: 404 },
-  ESPECIALIDAD_YA_ASIGNADA: { mensaje: 'El técnico ya tiene esa especialidad', status: 400 },
-  ESPECIALIDAD_NO_ENCONTRADA: { mensaje: 'El técnico no tiene esa especialidad', status: 404 },
+  TECNICO_NO_ENCONTRADO:      { mensaje: 'Tecnico no encontrado', status: 404 },
+  CATEGORIA_NO_ENCONTRADA:    { mensaje: 'Categoria no encontrada', status: 404 },
+  ESPECIALIDAD_YA_ASIGNADA:   { mensaje: 'El tecnico ya tiene esa especialidad', status: 400 },
+  ESPECIALIDAD_NO_ENCONTRADA: { mensaje: 'El tecnico no tiene esa especialidad', status: 404 },
 }
 
+// POST /api/admin/tecnicos/[id]/especialidades — asignar categoria al tecnico
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -45,6 +56,7 @@ export async function POST(
   }
 }
 
+// DELETE /api/admin/tecnicos/[id]/especialidades — quitar categoria del tecnico
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -63,6 +75,7 @@ export async function DELETE(
   }
 
   try {
+    // El servicio verifica que la especialidad exista antes de eliminarla
     await UsuarioService.quitarEspecialidad(tecnicoId, categoriaId)
     return NextResponse.json({ success: true }, { status: 200 })
   } catch (error: any) {

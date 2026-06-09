@@ -1,5 +1,28 @@
 'use client'
 
+/**
+ * ReportModal.tsx — Modal de creación de reportes ciudadanos.
+ *
+ * Componente principal del flujo ciudadano. Permite al usuario fotografiar
+ * un problema urbano, describir lo que observa y enviarlo al sistema para
+ * que la IA lo clasifique automáticamente.
+ *
+ * Flujo interno:
+ *   1. Solicitar permiso de ubicación al abrir el modal
+ *   2. Solicitar permiso de cámara al hacer clic en "Tomar foto"
+ *   3. Capturar foto con canvas (comprimida a JPEG 0.8)
+ *   4. Enviar formulario a POST /api/reports con FormData
+ *   5. Mostrar pantalla de éxito, rechazo o mensaje de error según respuesta
+ *
+ * Estados posibles tras el envío:
+ *   - showSuccess  : reporte aprobado o en revisión (ciudadano ve éxito en ambos casos)
+ *   - showRejected : IA rechazó el reporte (imagen inválida, fuera de Talca, etc.)
+ *   - submitMessage: error de validación o conexión
+ *
+ * Usado por: app/page.tsx (mapa ciudadano)
+ * Depende de: permissions.ts, NEXT_PUBLIC_APP_URL
+ */
+
 import { useEffect, useRef, useState } from 'react'
 import {
   LocationResult,
@@ -8,8 +31,8 @@ import {
 } from '@/app/lib/permissions'
 
 interface ReportModalProps {
-  isOpen: boolean
-  onClose: () => void
+  isOpen: boolean   // controla si el modal está visible
+  onClose: () => void // callback al cerrar el modal
 }
 
 export default function ReportModal({ isOpen, onClose }: ReportModalProps) {
@@ -23,9 +46,15 @@ export default function ReportModal({ isOpen, onClose }: ReportModalProps) {
   const [showSuccess, setShowSuccess] = useState(false)
   const [showRejected, setShowRejected] = useState(false)
   const [rejectReason, setRejectReason] = useState<string | null>(null)
+
+  // Referencias al video de cámara y canvas de captura — no causan re-renders
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
 
+  /**
+   * Solicita la ubicación GPS al abrir el modal.
+   * Se ejecuta solo cuando isOpen cambia a true.
+   */
   useEffect(() => {
     if (!isOpen) return
     const getLocation = async () => {
@@ -40,6 +69,10 @@ export default function ReportModal({ isOpen, onClose }: ReportModalProps) {
     getLocation()
   }, [isOpen])
 
+  /**
+   * Conecta el stream de la cámara al elemento <video> cuando está disponible.
+   * Se separa en un efecto propio para evitar condiciones de carrera con el ref.
+   */
   useEffect(() => {
     if (videoRef.current && cameraStream) {
       videoRef.current.srcObject = cameraStream
@@ -47,12 +80,20 @@ export default function ReportModal({ isOpen, onClose }: ReportModalProps) {
     }
   }, [cameraStream])
 
+  /**
+   * Limpia el stream de la cámara al desmontar el componente.
+   * Evita que la cámara quede activa en segundo plano.
+   */
   useEffect(() => {
     return () => {
       cameraStream?.getTracks().forEach((t) => t.stop())
     }
   }, [cameraStream])
 
+  /**
+   * Solicita acceso a la cámara trasera del dispositivo.
+   * En mobile, abre la cámara nativa; en desktop, abre la webcam.
+   */
   const openCamera = async () => {
     try {
       const stream = await requestCameraPermission()
@@ -62,6 +103,11 @@ export default function ReportModal({ isOpen, onClose }: ReportModalProps) {
     }
   }
 
+  /**
+   * Captura el frame actual del video y lo convierte a JPEG comprimido.
+   * Usa canvas para comprimir a calidad 0.8, reduciendo el tamaño del archivo
+   * antes de enviarlo al servidor (fotos de alta resolución pueden superar 8MB sin comprimir).
+   */
   const capturePhoto = () => {
     if (!videoRef.current) return
     const video = videoRef.current
@@ -71,21 +117,32 @@ export default function ReportModal({ isOpen, onClose }: ReportModalProps) {
     const ctx = canvas.getContext('2d')
     if (!ctx) return
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
-    setPhotoDataUrl(canvas.toDataURL('image/jpeg', 0.8))
-    cameraStream?.getTracks().forEach((t) => t.stop())
+    setPhotoDataUrl(canvas.toDataURL('image/jpeg', 0.8)) // compresión JPEG al 80%
+    cameraStream?.getTracks().forEach((t) => t.stop()) // liberar cámara tras captura
     setCameraStream(null)
   }
 
+  /**
+   * Envía el reporte al backend con foto, descripción y coordenadas.
+   * Convierte el dataURL de la foto a Blob para enviarlo como FormData multipart.
+   *
+   * Posibles respuestas del backend:
+   *   - res.ok + data.rechazado : IA rechazó → mostrar motivo al ciudadano
+   *   - res.ok                  : aprobado o en revisión → mostrar pantalla de éxito
+   *   - !res.ok                 : error de validación o servidor
+   */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSubmitMessage(null)
 
+    // Validaciones antes de enviar
     if (!description.trim()) { setSubmitMessage('Describe el problema'); return }
     if (!photoDataUrl) { setSubmitMessage('Captura una foto'); return }
     if (!coords) { setSubmitMessage('Ubicación no disponible'); return }
 
     setIsSubmitting(true)
     try {
+      // Convertir dataURL a File para enviarlo como multipart/form-data
       const blob = await (await fetch(photoDataUrl)).blob()
       const fotoFile = new File([blob], 'foto.jpg', { type: 'image/jpeg' })
 
@@ -107,14 +164,15 @@ export default function ReportModal({ isOpen, onClose }: ReportModalProps) {
         return
       }
 
-      // Reporte rechazado directamente por la IA (imagen inválida, no municipal, etc.)
+      // La IA rechazó el reporte (imagen inválida, no es problema municipal, etc.)
       if (data.rechazado) {
         setRejectReason(data.motivo)
         setShowRejected(true)
         return
       }
 
-      // Aprobado o a revisión: el ciudadano ve éxito en ambos casos
+      // Aprobado automáticamente o enviado a revisión manual —
+      // el ciudadano ve éxito en ambos casos para no exponer la lógica interna
       setShowSuccess(true)
 
     } catch {
@@ -124,6 +182,10 @@ export default function ReportModal({ isOpen, onClose }: ReportModalProps) {
     }
   }
 
+  /**
+   * Limpia todo el estado del modal al cerrarlo.
+   * Detiene la cámara si estaba activa y resetea todos los campos.
+   */
   const handleClose = () => {
     cameraStream?.getTracks().forEach((t) => t.stop())
     setCameraStream(null)
@@ -200,7 +262,7 @@ export default function ReportModal({ isOpen, onClose }: ReportModalProps) {
     )
   }
 
-  // ── Formulario ───────────────────────────────────────────────────────────────
+  // ── Formulario principal ─────────────────────────────────────────────────────
   return (
     <div className="fixed inset-0 z-[9999] flex items-end bg-black/50 md:items-center">
       <div className="w-full max-w-md rounded-t-3xl bg-white md:rounded-3xl md:shadow-lg">
@@ -215,7 +277,8 @@ export default function ReportModal({ isOpen, onClose }: ReportModalProps) {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4 overflow-y-auto p-4 max-h-[65vh]">
-          {/* Ubicación */}
+
+          {/* Ubicación GPS — se obtiene automáticamente al abrir el modal */}
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
             <p className="text-sm font-medium text-slate-700">📍 Ubicación</p>
             <p className="mt-1 text-sm text-slate-600">{locationState}</p>
@@ -226,10 +289,11 @@ export default function ReportModal({ isOpen, onClose }: ReportModalProps) {
             )}
           </div>
 
-          {/* Foto */}
+          {/* Foto — flujo: botón → stream de cámara → captura → preview */}
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
             <p className="text-sm font-medium text-slate-700 mb-3">📷 Foto del problema</p>
 
+            {/* Estado inicial: sin stream ni foto capturada */}
             {!cameraStream && !photoDataUrl && (
               <button
                 type="button"
@@ -241,6 +305,7 @@ export default function ReportModal({ isOpen, onClose }: ReportModalProps) {
               </button>
             )}
 
+            {/* Stream activo: mostrar video en vivo con botón de captura */}
             {cameraStream && (
               <div className="space-y-2">
                 <video
@@ -260,6 +325,7 @@ export default function ReportModal({ isOpen, onClose }: ReportModalProps) {
               </div>
             )}
 
+            {/* Foto capturada: preview con opción de retomar */}
             {photoDataUrl && (
               <div className="relative overflow-hidden rounded-lg border border-slate-300">
                 <img src={photoDataUrl} alt="Foto capturada" className="h-40 w-full object-cover" />
@@ -274,7 +340,7 @@ export default function ReportModal({ isOpen, onClose }: ReportModalProps) {
             )}
           </div>
 
-          {/* Descripción */}
+          {/* Descripción del problema — máximo 280 caracteres */}
           <div>
             <label htmlFor="description" className="block text-sm font-medium text-slate-700 mb-2">
               Describir el problema
@@ -291,10 +357,12 @@ export default function ReportModal({ isOpen, onClose }: ReportModalProps) {
             <p className="mt-1 text-right text-xs text-slate-400">{description.length}/280</p>
           </div>
 
+          {/* Mensajes de error de validación */}
           {submitMessage && (
             <p className="rounded-lg bg-slate-100 px-3 py-2 text-xs text-slate-700">{submitMessage}</p>
           )}
 
+          {/* Indicador de procesamiento IA — se muestra mientras el backend responde */}
           {isSubmitting && (
             <p className="text-center text-xs text-slate-500">
               Analizando reporte con inteligencia artificial...
@@ -319,6 +387,8 @@ export default function ReportModal({ isOpen, onClose }: ReportModalProps) {
           </div>
         </form>
       </div>
+
+      {/* Canvas oculto — usado para capturar y comprimir el frame de la cámara */}
       <canvas ref={canvasRef} className="hidden" />
     </div>
   )

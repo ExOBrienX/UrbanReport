@@ -1,11 +1,29 @@
 'use client'
 
+/**
+ * EvidenciaModal.tsx — Modal de captura de foto de evidencia para completar tarea.
+ *
+ * El tecnico debe fotografiar el trabajo terminado antes de marcar la tarea
+ * como completada. La foto se sube a Cloudflare R2 via POST /api/tasks/[id].
+ *
+ * Flujo interno:
+ *   1. Boton "Tomar foto" — solicita permiso de camara trasera
+ *   2. Stream de video en vivo — boton "Capturar" congela el frame
+ *   3. Preview de la foto — opcion de repetir si no es satisfactoria
+ *   4. Boton "Completar tarea" — envia el dataURL al padre via onConfirmar
+ *
+ * La camara se libera automaticamente al capturar la foto o al cerrar el modal
+ * para no dejarla activa en segundo plano.
+ *
+ * Usado por: app/tecnico/page.tsx
+ */
+
 import { useEffect, useRef, useState } from 'react'
 
 interface EvidenciaModalProps {
-  onConfirmar: (foto: string) => void
+  onConfirmar: (foto: string) => void // dataURL de la foto capturada
   onCancelar: () => void
-  accionando: boolean
+  accionando: boolean                 // true mientras se sube la foto al servidor
 }
 
 export default function EvidenciaModal({ onConfirmar, onCancelar, accionando }: EvidenciaModalProps) {
@@ -14,6 +32,7 @@ export default function EvidenciaModal({ onConfirmar, onCancelar, accionando }: 
   const [errorCamara, setErrorCamara] = useState<string | null>(null)
   const videoRef = useRef<HTMLVideoElement | null>(null)
 
+  // Conectar el stream al elemento video cuando esta disponible
   useEffect(() => {
     if (videoRef.current && cameraStream) {
       videoRef.current.srcObject = cameraStream
@@ -21,10 +40,15 @@ export default function EvidenciaModal({ onConfirmar, onCancelar, accionando }: 
     }
   }, [cameraStream])
 
+  // Liberar la camara al desmontar el componente
   useEffect(() => {
     return () => { cameraStream?.getTracks().forEach(t => t.stop()) }
   }, [cameraStream])
 
+  /**
+   * Solicita acceso a la camara trasera del dispositivo.
+   * facingMode 'environment' selecciona la camara trasera en movil.
+   */
   const abrirCamara = async () => {
     setErrorCamara(null)
     try {
@@ -33,22 +57,29 @@ export default function EvidenciaModal({ onConfirmar, onCancelar, accionando }: 
       })
       setCameraStream(stream)
     } catch {
-      setErrorCamara('No se pudo acceder a la cámara')
+      setErrorCamara('No se pudo acceder a la camara')
     }
   }
 
+  /**
+   * Captura el frame actual del video usando canvas y lo convierte a JPEG.
+   * Libera la camara inmediatamente despues de capturar.
+   */
   const capturarFoto = () => {
     if (!videoRef.current) return
     const video = videoRef.current
     const canvas = document.createElement('canvas')
-    canvas.width = video.videoWidth || 640
+    canvas.width  = video.videoWidth  || 640
     canvas.height = video.videoHeight || 480
     canvas.getContext('2d')?.drawImage(video, 0, 0)
-    setFotoDataUrl(canvas.toDataURL('image/jpeg', 0.8))
-    cameraStream?.getTracks().forEach(t => t.stop())
+    setFotoDataUrl(canvas.toDataURL('image/jpeg', 0.8)) // compresion JPEG al 80%
+    cameraStream?.getTracks().forEach(t => t.stop())    // liberar camara tras captura
     setCameraStream(null)
   }
 
+  /**
+   * Cancela el modal limpiando la camara y la foto capturada.
+   */
   const handleCancelar = () => {
     cameraStream?.getTracks().forEach(t => t.stop())
     setCameraStream(null)
@@ -57,17 +88,20 @@ export default function EvidenciaModal({ onConfirmar, onCancelar, accionando }: 
   }
 
   return (
+    // Overlay — clic fuera del sheet cancela el modal
     <div className="fixed inset-0 z-50 flex items-end bg-black/50" onClick={handleCancelar}>
       <div
         className="w-full bg-white rounded-t-3xl p-6 space-y-4"
         onClick={e => e.stopPropagation()}
       >
+        {/* Indicador visual de sheet deslizable */}
         <div className="w-10 h-1 bg-slate-200 rounded-full mx-auto" />
         <h3 className="text-base font-semibold text-slate-900">Foto de evidencia</h3>
         <p className="text-sm text-slate-500">
           Toma una foto del trabajo terminado para completar la tarea.
         </p>
 
+        {/* Estado inicial: sin stream ni foto */}
         {!cameraStream && !fotoDataUrl && (
           <button
             onClick={abrirCamara}
@@ -78,10 +112,12 @@ export default function EvidenciaModal({ onConfirmar, onCancelar, accionando }: 
           </button>
         )}
 
+        {/* Error de acceso a camara */}
         {errorCamara && (
           <p className="text-sm text-red-600 text-center">{errorCamara}</p>
         )}
 
+        {/* Stream activo — video en vivo con boton de captura */}
         {cameraStream && (
           <div className="space-y-3">
             <video
@@ -100,15 +136,17 @@ export default function EvidenciaModal({ onConfirmar, onCancelar, accionando }: 
           </div>
         )}
 
+        {/* Preview de la foto capturada con opcion de repetir */}
         {fotoDataUrl && (
           <div className="space-y-3">
             <div className="relative rounded-2xl overflow-hidden">
               <img src={fotoDataUrl} alt="Evidencia" className="w-full h-52 object-cover" />
+              {/* Boton para descartar y volver a tomar la foto */}
               <button
                 onClick={() => setFotoDataUrl(null)}
                 className="absolute top-2 right-2 rounded-full bg-black/60 px-2 py-1 text-xs text-white hover:bg-black/80"
               >
-                ✕ Repetir
+                X Repetir
               </button>
             </div>
           </div>
@@ -121,6 +159,7 @@ export default function EvidenciaModal({ onConfirmar, onCancelar, accionando }: 
           >
             Cancelar
           </button>
+          {/* Boton activo solo cuando hay foto y no hay accion en progreso */}
           <button
             onClick={() => fotoDataUrl && onConfirmar(fotoDataUrl)}
             disabled={!fotoDataUrl || accionando}
