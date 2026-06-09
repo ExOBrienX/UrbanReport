@@ -86,6 +86,10 @@ export class TareaService {
    * Cambia el estado de una tarea según la acción del técnico.
    * Valida que la transición sea válida, sincroniza la incidencia
    * y registra el cambio en historial_estados.
+   *
+   * RACE CONDITION FIX: La acción 'aceptar' usa updateMany con condición
+   * atómica (WHERE estado='asignada') para evitar que dos técnicos acepten
+   * la misma tarea simultáneamente. Si count=0, otro técnico se adelantó.
    */
   static async cambiarEstado(
     tareaId: number,
@@ -104,25 +108,53 @@ export class TareaService {
       throw new Error('SIN_PERMISO')
     }
 
+    // ── Caso especial: aceptar con actualización atómica ─────────────────────
+    if (accion === 'aceptar') {
+      if (tarea.estado !== 'asignada') throw new Error('TAREA_YA_ACEPTADA')
+
+      // Verificar que el técnico no tenga ya una tarea activa
+      const tareaActiva = await prisma.tarea.findFirst({
+        where: {
+          tecnico_id: tecnicoId,
+          estado: { in: ['aceptada', 'en_curso', 'atrasada'] }
+        }
+      })
+      if (tareaActiva) throw new Error('YA_TIENE_TAREA_ACTIVA')
+
+      // updateMany con WHERE estado='asignada' — si otro técnico se adelantó,
+      // el estado ya cambió y count será 0 (operación atómica en BD)
+      const resultado = await prisma.tarea.updateMany({
+        where: { id: tareaId, estado: 'asignada' },
+        data: { estado: 'aceptada', tecnico_id: tecnicoId }
+      })
+
+      // Si nadie fue afectado, otro técnico ganó la carrera
+      if (resultado.count === 0) throw new Error('TAREA_YA_ACEPTADA')
+
+      // Sincronizar incidencia, historial y prioridad
+      await prisma.incidencia.update({
+        where: { id: tarea.incidencia_id },
+        data: { estado: 'asignado' }
+      })
+      await prisma.historialEstado.create({
+        data: {
+          tarea_id: tareaId,
+          estado_anterior: 'asignada',
+          estado_nuevo: 'aceptada',
+          cambiado_por_id: tecnicoId
+        }
+      })
+      await PriorityService.recalcularPrioridad(tarea.incidencia_id)
+      console.log(`✅ Tarea ${tareaId}: asignada → aceptada (técnico ${tecnicoId})`)
+      return prisma.tarea.findUnique({ where: { id: tareaId } })
+    }
+
+    // ── Resto de acciones: iniciar, atraso, completar ─────────────────────────
     let nuevoEstadoTarea: string
     let nuevoEstadoIncidencia: string
     let datosExtra: Record<string, unknown> = {}
 
     switch (accion) {
-      case 'aceptar':
-        if (tarea.estado !== 'asignada') throw new Error('TAREA_YA_ACEPTADA')
-        const tareaActiva = await prisma.tarea.findFirst({
-          where: {
-            tecnico_id: tecnicoId,
-            estado: { in: ['aceptada', 'en_curso', 'atrasada'] }
-          }
-        })
-        if (tareaActiva) throw new Error('YA_TIENE_TAREA_ACTIVA')
-        nuevoEstadoTarea = 'aceptada'
-        nuevoEstadoIncidencia = 'asignado'
-        datosExtra = { tecnico_id: tecnicoId }
-        break
-
       case 'iniciar':
         if (tarea.estado !== 'aceptada') throw new Error('DEBE_ACEPTAR_PRIMERO')
         nuevoEstadoTarea = 'en_curso'
@@ -229,8 +261,8 @@ export class TareaService {
    * El motivo de cancelación es obligatorio según RF-19.
    * La incidencia vuelve a estado 'pendiente' para ser reasignada.
    *
-   * @param tareaId          - ID de la tarea a cancelar
-   * @param adminId          - ID del admin que cancela (para historial)
+   * @param tareaId           - ID de la tarea a cancelar
+   * @param adminId           - ID del admin que cancela (para historial)
    * @param motivoCancelacion - Motivo obligatorio de la cancelación
    */
   static async cancelar(tareaId: number, adminId: number, motivoCancelacion: string) {
@@ -243,13 +275,12 @@ export class TareaService {
 
     if (!tarea) throw new Error('TAREA_NO_ENCONTRADA')
 
-    // Solo se pueden cancelar tareas activas — no tiene sentido cancelar una completada
+    // Solo se pueden cancelar tareas activas
     const estadosCancelables = ['asignada', 'aceptada', 'en_curso', 'atrasada']
     if (!estadosCancelables.includes(tarea.estado)) {
       throw new Error('TAREA_NO_CANCELABLE')
     }
 
-    // Cancelar la tarea registrando el motivo y quién la canceló
     const tareaActualizada = await prisma.tarea.update({
       where: { id: tareaId },
       data: {
@@ -265,7 +296,6 @@ export class TareaService {
       data: { estado: 'pendiente' }
     })
 
-    // Registrar en historial para trazabilidad
     await prisma.historialEstado.create({
       data: {
         tarea_id: tareaId,
@@ -281,15 +311,7 @@ export class TareaService {
 
   /**
    * El admin crea una tarea urgente manual sin pasar por el flujo ciudadano ni la IA.
-   * Útil para emergencias detectadas directamente por el municipio (RF-21).
-   * La tarea se asigna directamente al técnico elegido por el admin.
-   *
-   * @param categoriaId - Categoría de la incidencia
-   * @param latitud     - Coordenada del problema
-   * @param longitud    - Coordenada del problema
-   * @param descripcion - Descripción del problema por el admin
-   * @param tecnicoId   - Técnico al que se asignará directamente
-   * @param adminId     - Admin que crea la tarea (para trazabilidad)
+   * La tarea se asigna directamente al técnico elegido por el admin (RF-21).
    */
   static async crearUrgente(
     categoriaId: number,
@@ -299,19 +321,16 @@ export class TareaService {
     tecnicoId: number,
     adminId: number
   ) {
-    // Verificar que la categoría exista y esté activa
     const categoria = await prisma.categoria.findUnique({
       where: { id: categoriaId, activo: true }
     })
     if (!categoria) throw new Error('CATEGORIA_NO_ENCONTRADA')
 
-    // Verificar que el técnico exista y esté activo
     const tecnico = await prisma.usuario.findUnique({
       where: { id: tecnicoId, activo: true, rol: 'tecnico' }
     })
     if (!tecnico) throw new Error('TECNICO_NO_ENCONTRADO')
 
-    // Crear la incidencia urgente directamente sin pasar por Haversine ni IA
     const incidencia = await prisma.incidencia.create({
       data: {
         categoria_id: categoriaId,
@@ -322,14 +341,12 @@ export class TareaService {
       }
     })
 
-    // Calcular prioridad inicial
     const prioridad = await PriorityService.recalcularPrioridad(incidencia.id)
 
-    // Crear la tarea asignada directamente al técnico elegido por el admin
     const tarea = await prisma.tarea.create({
       data: {
         incidencia_id: incidencia.id,
-        tecnico_id: tecnicoId,  // asignación directa, no cola compartida
+        tecnico_id: tecnicoId,
         estado: 'asignada'
       }
     })
@@ -337,23 +354,17 @@ export class TareaService {
     console.log(`✅ Tarea urgente ${tarea.id} creada por admin ${adminId} → técnico ${tecnicoId}`)
     return { tarea, incidencia, prioridad }
   }
+
   /**
-   * Asigna un técnico a una incidencia que está en estado 'pendiente' sin tarea activa.
-   * Se usa cuando la IA aprobó un reporte pero no había técnicos disponibles,
-   * o cuando el admin cancela una tarea y quiere reasignar manualmente.
-   *
-   * @param incidenciaId - ID de la incidencia pendiente sin técnico
-   * @param tecnicoId    - ID del técnico a asignar
-   * @param adminId      - ID del admin que realiza la asignación
+   * Asigna un técnico a una incidencia pendiente sin tarea activa.
+   * Se usa cuando el admin reasigna manualmente desde el panel de incidencias.
    */
   static async asignarAIncidenciaExistente(incidenciaId: number, tecnicoId: number, adminId: number) {
-    // Verificar que la incidencia existe y está pendiente
     const incidencia = await prisma.incidencia.findUnique({
       where: { id: incidenciaId }
     })
     if (!incidencia) throw new Error('INCIDENCIA_NO_ENCONTRADA')
 
-    // Verificar que no tenga ya una tarea activa
     const tareaActiva = await prisma.tarea.findFirst({
       where: {
         incidencia_id: incidenciaId,
@@ -362,13 +373,11 @@ export class TareaService {
     })
     if (tareaActiva) throw new Error('YA_TIENE_TAREA_ACTIVA')
 
-    // Verificar que el técnico existe y está activo
     const tecnico = await prisma.usuario.findUnique({
       where: { id: tecnicoId, activo: true, rol: 'tecnico' }
     })
     if (!tecnico) throw new Error('TECNICO_NO_ENCONTRADO')
 
-    // Crear tarea asignada directamente al técnico
     const tarea = await prisma.tarea.create({
       data: {
         incidencia_id: incidenciaId,
@@ -377,13 +386,11 @@ export class TareaService {
       }
     })
 
-    // Actualizar estado de la incidencia a 'asignado'
     await prisma.incidencia.update({
       where: { id: incidenciaId },
       data: { estado: 'asignado' }
     })
 
-    // Recalcular prioridad con el nuevo estado
     await PriorityService.recalcularPrioridad(incidenciaId)
 
     console.log(`✅ Técnico ${tecnicoId} asignado a incidencia ${incidenciaId} por admin ${adminId}`)

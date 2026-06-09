@@ -59,10 +59,10 @@ interface UseCityMapResult {
 export function useCityMap({ map, onClusterOpen }: UseCityMapOptions): UseCityMapResult {
 
   // useRef permite guardar valores que persisten entre renders sin causar re-renders
-  const markersRef = useRef<L.CircleMarker[]>([])       // burbujas individuales en el mapa
-  const clusterGroupRef = useRef<any>(null)             // grupo de clusters de Leaflet
-  const numberedMarkersRef = useRef<L.Marker[]>([])     // marcadores numerados al abrir cluster
-  const isProcessingClusterRef = useRef(false)          // flag para evitar doble procesamiento
+  const markersRef = useRef<L.CircleMarker[]>([])         // burbujas individuales en el mapa
+  const clusterGroupRef = useRef<any>(null)               // grupo de clusters de Leaflet
+  const numberedMarkersRef = useRef<L.Marker[]>([])       // marcadores numerados al abrir cluster
+  const isProcessingClusterRef = useRef(false)            // flag para evitar doble procesamiento
   const intervalRef = useRef<NodeJS.Timeout | null>(null) // referencia al intervalo de polling
 
   /**
@@ -159,9 +159,11 @@ export function useCityMap({ map, onClusterOpen }: UseCityMapOptions): UseCityMa
 
       // Crear grupo de clusters — agrupa burbujas cercanas automáticamente
       const clusterGroup = (L as any).markerClusterGroup({
-        maxClusterRadius: 40,         // radio en píxeles para agrupar marcadores
-        spiderfyOnMaxZoom: false,     // no dispersar en araña al máximo zoom
-        zoomToBoundsOnClick: true,    // hacer zoom al área del cluster al hacer clic
+        maxClusterRadius: 40,        // radio en píxeles para agrupar marcadores
+        spiderfyOnMaxZoom: false,    // no dispersar en araña al máximo zoom
+        zoomToBoundsOnClick: true,   // hacer zoom al área del cluster al hacer clic
+        disableClusteringAtZoom: 18, // a zoom 18 mostrar individuales — evita error "Map has no maxZoom"
+
         // Función que define la apariencia del ícono de cluster
         iconCreateFunction: (cluster: any) => {
           const count = cluster.getChildCount() // cantidad de reportes agrupados
@@ -189,26 +191,27 @@ export function useCityMap({ map, onClusterOpen }: UseCityMapOptions): UseCityMa
 
         // Solo expandir clusters pequeños (<=7) para no saturar la pantalla
         if (markers.length <= 7) {
-          // Extraer los datos del reporte guardados en cada marcador
           const reportesDelCluster = markers.map((marker: any) => marker.options.reporteData)
           map.removeLayer(cluster) // ocultar el cluster mientras se muestra el detalle
 
-          // Obtener la dirección de cada reporte de forma asíncrona (geocodificación inversa)
-          Promise.all(
-            reportesDelCluster.map(async (reporte: Reporte) => ({
-              ...reporte,
-              calle: await getCalle(parseFloat(reporte.latitud), parseFloat(reporte.longitud)),
-            }))
-          )
-            .then((reportesConCalle) => {
-              stopPolling()               // pausar polling mientras se ve el detalle
-              onClusterOpen(reportesConCalle) // abrir el ClusterSheet con los datos
+          // Cargar calles secuencialmente — evita saturar el rate limit de Jawg
+          // Promise.all enviaba todas en paralelo causando errores "Dirección no disponible"
+          ;(async () => {
+            try {
+              const reportesConCalle: ReporteConCalle[] = []
+              for (const reporte of reportesDelCluster) {
+                const calle = await getCalle(parseFloat(reporte.latitud), parseFloat(reporte.longitud))
+                reportesConCalle.push({ ...reporte, calle })
+              }
+              stopPolling()                    // pausar polling mientras se ve el detalle
+              onClusterOpen(reportesConCalle)  // abrir el ClusterSheet con los datos
               showNumberedMarkers(reportesConCalle) // mostrar números sobre el mapa
+            } catch {
+              // Si falla la geocodificación, abrir igual sin dirección
+            } finally {
               isProcessingClusterRef.current = false
-            })
-            .catch(() => {
-              isProcessingClusterRef.current = false
-            })
+            }
+          })()
         } else {
           isProcessingClusterRef.current = false
         }
@@ -244,7 +247,7 @@ export function useCityMap({ map, onClusterOpen }: UseCityMapOptions): UseCityMa
             { duration: 1 } // duración de la animación en segundos
           )
 
-          // Obtener nombre de la calle usando geocodificación inversa (OpenStreetMap)
+          // Obtener nombre de la calle usando geocodificación inversa
           const calle = await getCalle(parseFloat(reporte.latitud), parseFloat(reporte.longitud))
 
           // Mostrar popup con la información del reporte
@@ -303,8 +306,8 @@ export function useCityMap({ map, onClusterOpen }: UseCityMapOptions): UseCityMa
    */
   useEffect(() => {
     if (!map) return
-    loadReportes()    // carga inicial de reportes
-    restartPolling()  // iniciar actualización automática
+    loadReportes()   // carga inicial de reportes
+    restartPolling() // iniciar actualización automática
 
     // Limpieza al desmontar: detener polling y eliminar capas del mapa
     return () => {

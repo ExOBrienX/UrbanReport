@@ -1,5 +1,35 @@
 'use client'
 
+/**
+ * app/tecnico/page.tsx — Panel principal del tecnico municipal (SPA mobile-first).
+ *
+ * Vista unica que muestra la cola de tareas disponibles y el estado de la
+ * tarea activa del tecnico autenticado. Disenada para usarse en terreno
+ * desde un dispositivo movil.
+ *
+ * Logica de tareas:
+ *   - Tarea activa: tarea propia en estado aceptada, en_curso o atrasada.
+ *                   Se muestra en un banner destacado al inicio.
+ *   - Tareas disponibles: tareas sin tecnico asignado (estado 'asignada')
+ *                         de las especialidades del tecnico. Se muestran
+ *                         en la cola para ser aceptadas.
+ *
+ * Flujo de acciones:
+ *   Aceptar  → PATCH /api/tasks/[id] { accion: 'aceptar' }
+ *   Iniciar  → PATCH /api/tasks/[id] { accion: 'iniciar' }
+ *   Atraso   → PATCH /api/tasks/[id] { accion: 'atraso', motivo_atraso }
+ *   Completar → POST /api/tasks/[id] (multipart con foto de evidencia)
+ *
+ * Modales auxiliares:
+ *   TareaDetalleSheet — detalle completo de una tarea con acciones
+ *   AtrasoModal       — selector de motivo de atraso
+ *   EvidenciaModal    — camara para foto de evidencia al completar
+ *
+ * Usado por: Next.js router — ruta /tecnico
+ * Depende de: TareaCard, TareaDetalleSheet, AtrasoModal, EvidenciaModal,
+ *             GET /api/tasks, PATCH /api/tasks/[id], POST /api/tasks/[id]
+ */
+
 import { useSession, signOut } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState, useCallback } from 'react'
@@ -14,7 +44,7 @@ export default function TecnicoPage() {
 
   const [tareas, setTareas] = useState<Tarea[]>([])
   const [loading, setLoading] = useState(true)
-  const [accionando, setAccionando] = useState(false)
+  const [accionando, setAccionando] = useState(false) // true mientras se procesa una accion
   const [tareaSeleccionada, setTareaSeleccionada] = useState<Tarea | null>(null)
   const [showDetalle, setShowDetalle] = useState(false)
   const [showAtraso, setShowAtraso] = useState(false)
@@ -23,10 +53,15 @@ export default function TecnicoPage() {
 
   const tecnicoId = parseInt(session?.user?.id ?? '0')
 
+  // Redirigir al acceso si la sesion expira o el usuario no esta autenticado
   useEffect(() => {
     if (status === 'unauthenticated') router.push('/acceso')
   }, [status, router])
 
+  /**
+   * Carga la cola de tareas del tecnico desde el backend.
+   * Incluye tareas disponibles de su especialidad y su tarea activa propia.
+   */
   const cargarTareas = useCallback(async () => {
     try {
       const res = await fetch('/api/tasks')
@@ -48,6 +83,11 @@ export default function TecnicoPage() {
     setTimeout(() => setMensaje(null), 4000)
   }
 
+  /**
+   * Ejecuta una accion de estado sobre una tarea via PATCH.
+   * Retorna true si la accion fue exitosa, false si hubo error.
+   * extra permite enviar campos adicionales como motivo_atraso.
+   */
   const ejecutarAccion = async (tareaId: number, accion: string, extra?: Record<string, string>) => {
     setAccionando(true)
     try {
@@ -62,23 +102,28 @@ export default function TecnicoPage() {
       await cargarTareas()
       return true
     } catch {
-      mostrarMensaje('error', 'Error de conexión')
+      mostrarMensaje('error', 'Error de conexion')
       return false
     } finally {
       setAccionando(false)
     }
   }
 
+  // Mensaje de confirmacion por tipo de accion
   const mensajeAccion = (accion: string) => {
     const msgs: Record<string, string> = {
-      aceptar: 'Tarea aceptada correctamente',
-      iniciar: 'Trabajo iniciado',
-      atraso: 'Atraso reportado',
+      aceptar:  'Tarea aceptada correctamente',
+      iniciar:  'Trabajo iniciado',
+      atraso:   'Atraso reportado',
       completar: 'Tarea completada'
     }
-    return msgs[accion] ?? 'Acción realizada'
+    return msgs[accion] ?? 'Accion realizada'
   }
 
+  /**
+   * Sube la foto de evidencia como multipart y completa la tarea.
+   * Convierte el dataURL de la camara a un File antes de enviarlo.
+   */
   const subirEvidencia = async (tareaId: number, fotoDataUrl: string) => {
     setAccionando(true)
     try {
@@ -90,7 +135,7 @@ export default function TecnicoPage() {
       const res = await fetch(`/api/tasks/${tareaId}`, { method: 'POST', body: formData })
       const data = await res.json()
       if (!res.ok) { mostrarMensaje('error', data.error); return }
-      mostrarMensaje('ok', '✅ Tarea completada con evidencia')
+      mostrarMensaje('ok', 'Tarea completada con evidencia')
       setShowEvidencia(false)
       setShowDetalle(false)
       setTareaSeleccionada(null)
@@ -102,13 +147,13 @@ export default function TecnicoPage() {
     }
   }
 
-  // Tarea activa propia (en curso, aceptada o atrasada)
+  // Tarea propia activa — el tecnico solo puede tener una a la vez
   const tareaActiva = tareas.find(t =>
     t.tecnico_id === tecnicoId &&
     ['aceptada', 'en_curso', 'atrasada'].includes(t.estado)
   )
 
-  // Tareas disponibles (sin tecnico asignado)
+  // Tareas sin tecnico asignado disponibles para aceptar
   const tareasDisponibles = tareas.filter(t => t.estado === 'asignada')
 
   const abrirDetalle = (tarea: Tarea) => {
@@ -127,7 +172,7 @@ export default function TecnicoPage() {
   return (
     <div className="min-h-screen bg-slate-950 text-white">
 
-      {/* Header */}
+      {/* Header con nombre del tecnico y boton de cierre de sesion */}
       <div className="px-5 pt-12 pb-5">
         <div className="flex items-start justify-between">
           <div>
@@ -143,7 +188,7 @@ export default function TecnicoPage() {
         </div>
       </div>
 
-      {/* Mensaje */}
+      {/* Mensaje de confirmacion o error de acciones */}
       {mensaje && (
         <div className={`mx-5 mb-3 rounded-2xl px-4 py-3 text-sm font-medium ${
           mensaje.tipo === 'ok'
@@ -154,24 +199,25 @@ export default function TecnicoPage() {
         </div>
       )}
 
-      {/* Banner tarea activa */}
+      {/* Banner de tarea activa — pulsa para ver el detalle */}
       {tareaActiva && (
         <div
           className="mx-5 mb-4 rounded-2xl bg-blue-600/20 border border-blue-500/30 px-4 py-3 flex items-center justify-between cursor-pointer hover:bg-blue-600/30 transition-colors"
           onClick={() => abrirDetalle(tareaActiva)}
         >
           <div className="flex items-center gap-2">
+            {/* Punto animado indica que hay trabajo en progreso */}
             <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
             <p className="text-sm text-blue-300 font-medium">
               {tareaActiva.estado === 'en_curso' ? 'Tarea en curso' :
                tareaActiva.estado === 'atrasada' ? 'Tarea con atraso' : 'Tarea aceptada'}
             </p>
           </div>
-          <span className="text-blue-400 text-xs">Ver →</span>
+          <span className="text-blue-400 text-xs">Ver</span>
         </div>
       )}
 
-      {/* Cola de tareas */}
+      {/* Cola de tareas disponibles */}
       <div className="px-5 pb-8 space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wide">
@@ -184,7 +230,6 @@ export default function TecnicoPage() {
 
         {tareasDisponibles.length === 0 && !tareaActiva ? (
           <div className="text-center py-16 space-y-2">
-            <p className="text-4xl">✅</p>
             <p className="text-slate-400 text-sm">No hay tareas disponibles</p>
           </div>
         ) : (
@@ -204,7 +249,7 @@ export default function TecnicoPage() {
         )}
       </div>
 
-      {/* Sheet detalle */}
+      {/* Sheet de detalle — acciones segun estado de la tarea */}
       {showDetalle && tareaSeleccionada && (
         <TareaDetalleSheet
           tarea={tareaSeleccionada}
@@ -224,7 +269,7 @@ export default function TecnicoPage() {
         />
       )}
 
-      {/* Modal atraso */}
+      {/* Modal para reportar motivo de atraso */}
       {showAtraso && tareaSeleccionada && (
         <AtrasoModal
           onConfirmar={async (motivo) => {
@@ -236,7 +281,7 @@ export default function TecnicoPage() {
         />
       )}
 
-      {/* Modal evidencia */}
+      {/* Modal para capturar foto de evidencia al completar */}
       {showEvidencia && tareaSeleccionada && (
         <EvidenciaModal
           onConfirmar={(foto) => subirEvidencia(tareaSeleccionada.id, foto)}

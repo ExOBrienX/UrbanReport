@@ -1,19 +1,23 @@
 'use client'
 
 /**
- * Configuracion.tsx — Vista de configuración del sistema (RF-25).
+ * Configuracion.tsx — Vista de configuracion del sistema (RF-25).
  *
- * Permite al administrador ajustar parámetros del sistema sin modificar código.
- * Actualmente gestiona el umbral de confianza de la IA para la clasificación
- * automática de reportes ciudadanos.
+ * Permite al administrador ajustar parametros del sistema sin modificar codigo.
+ * Actualmente gestiona el umbral de confianza de la IA para la clasificacion
+ * automatica de reportes ciudadanos.
  *
  * Umbral de confianza:
- *   - Si la IA supera este porcentaje, el reporte se aprueba automáticamente.
- *   - Si no lo supera, va a la Bandeja de Revisión para aprobación manual.
+ *   - Si la IA supera este porcentaje, el reporte se aprueba automaticamente.
+ *   - Si no lo supera, va a la Bandeja de Revision para aprobacion manual.
  *   - Valor recomendado: 60-80%.
  *
- * Usa: GET /api/admin/config, PUT /api/admin/config
- * Servicio backend: ConfiguracionService.ts
+ * El boton "Guardar" solo se activa cuando el valor fue modificado respecto
+ * al valor actual en BD — evita llamadas innecesarias a la API.
+ * Los cambios se aplican de inmediato sin reiniciar el servidor.
+ *
+ * Usado por: app/admin/page.tsx
+ * Depende de: GET /api/admin/config, PUT /api/admin/config
  */
 
 import { useEffect, useState } from 'react'
@@ -111,7 +115,7 @@ export default function Configuracion() {
         mostrarMensaje('error', data.error ?? 'Error al guardar')
         return
       }
-      mostrarMensaje('ok', '✅ Configuración guardada correctamente')
+      mostrarMensaje('ok', 'Configuración guardada correctamente')
       cargar() // Recargar para confirmar el valor guardado
     } finally {
       setGuardando(null)

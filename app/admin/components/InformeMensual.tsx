@@ -1,17 +1,24 @@
 'use client'
 
 /**
- * InformeMensual.tsx — Vista de generación de informe mensual con IA (RF-24).
+ * InformeMensual.tsx — Vista de generacion de informe mensual con IA (RF-24).
  *
- * Permite al administrador seleccionar un período con datos reales,
+ * Permite al administrador seleccionar un periodo con datos reales,
  * generar un informe ejecutivo usando Claude Haiku y descargarlo como PDF.
  *
  * Flujo:
- *   1. Carga los períodos disponibles desde /api/admin/informes/disponibles
- *   2. Admin selecciona año y mes (solo con datos reales)
- *   3. Llama a POST /api/admin/informes
- *   4. Renderiza el informe con formato de documento
- *   5. Permite descargar como PDF
+ *   1. Carga los periodos disponibles desde /api/admin/informes/disponibles
+ *   2. Admin selecciona ano y mes (solo periodos con incidencias reales)
+ *   3. Llama a POST /api/admin/informes con mes y ano
+ *   4. Renderiza el resultado como preview de documento A4
+ *   5. Permite descargar como PDF via ventana de impresion del navegador
+ *
+ * Si no hay periodos disponibles, muestra aviso y deshabilita el boton.
+ * El renderizador de Markdown convierte el texto de la IA a HTML con
+ * soporte de encabezados, negrita, separadores, listas y tablas.
+ *
+ * Usado por: app/admin/page.tsx
+ * Depende de: POST /api/admin/informes, GET /api/admin/informes/disponibles
  */
 
 import { useEffect, useState } from 'react'
@@ -231,7 +238,7 @@ export default function InformeMensual() {
               className="bg-slate-900 text-white px-6 py-2.5 rounded-xl text-sm font-bold hover:bg-slate-700 disabled:bg-slate-300 disabled:text-slate-400 transition-all flex items-center gap-2 flex-shrink-0">
               {generando
                 ? <><span className="animate-spin">⟳</span> Generando...</>
-                : <>📊 Generar informe</>
+                : <>Generar informe</>
               }
             </button>
           </div>
@@ -264,7 +271,7 @@ export default function InformeMensual() {
             </div>
             <button onClick={handleDescargarPDF}
               className="flex items-center gap-2 bg-red-600 text-white text-xs font-bold px-4 py-2 rounded-xl hover:bg-red-700 transition-colors">
-              📄 Descargar PDF
+              Descargar PDF
             </button>
           </div>
 
