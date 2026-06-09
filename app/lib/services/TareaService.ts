@@ -337,4 +337,56 @@ export class TareaService {
     console.log(`✅ Tarea urgente ${tarea.id} creada por admin ${adminId} → técnico ${tecnicoId}`)
     return { tarea, incidencia, prioridad }
   }
+  /**
+   * Asigna un técnico a una incidencia que está en estado 'pendiente' sin tarea activa.
+   * Se usa cuando la IA aprobó un reporte pero no había técnicos disponibles,
+   * o cuando el admin cancela una tarea y quiere reasignar manualmente.
+   *
+   * @param incidenciaId - ID de la incidencia pendiente sin técnico
+   * @param tecnicoId    - ID del técnico a asignar
+   * @param adminId      - ID del admin que realiza la asignación
+   */
+  static async asignarAIncidenciaExistente(incidenciaId: number, tecnicoId: number, adminId: number) {
+    // Verificar que la incidencia existe y está pendiente
+    const incidencia = await prisma.incidencia.findUnique({
+      where: { id: incidenciaId }
+    })
+    if (!incidencia) throw new Error('INCIDENCIA_NO_ENCONTRADA')
+
+    // Verificar que no tenga ya una tarea activa
+    const tareaActiva = await prisma.tarea.findFirst({
+      where: {
+        incidencia_id: incidenciaId,
+        estado: { in: ['asignada', 'aceptada', 'en_curso', 'atrasada'] }
+      }
+    })
+    if (tareaActiva) throw new Error('YA_TIENE_TAREA_ACTIVA')
+
+    // Verificar que el técnico existe y está activo
+    const tecnico = await prisma.usuario.findUnique({
+      where: { id: tecnicoId, activo: true, rol: 'tecnico' }
+    })
+    if (!tecnico) throw new Error('TECNICO_NO_ENCONTRADO')
+
+    // Crear tarea asignada directamente al técnico
+    const tarea = await prisma.tarea.create({
+      data: {
+        incidencia_id: incidenciaId,
+        tecnico_id: tecnicoId,
+        estado: 'asignada'
+      }
+    })
+
+    // Actualizar estado de la incidencia a 'asignado'
+    await prisma.incidencia.update({
+      where: { id: incidenciaId },
+      data: { estado: 'asignado' }
+    })
+
+    // Recalcular prioridad con el nuevo estado
+    await PriorityService.recalcularPrioridad(incidenciaId)
+
+    console.log(`✅ Técnico ${tecnicoId} asignado a incidencia ${incidenciaId} por admin ${adminId}`)
+    return { tarea, incidencia: { id: incidenciaId, estado: 'asignado' } }
+  }
 }

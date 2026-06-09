@@ -21,7 +21,7 @@ export interface ResultadoIA {
 }
 
 const CATEGORIAS_VALIDAS = [
-  'Pavimento', 'Veredas', 'Areas Verdes', 'Senaletica', 'Residuos', 'Mobiliario'
+  'Pavimento', 'Veredas', 'Señaletica', 'Areas Verdes', 'Residuos', 'Mobiliario'
 ]
 
 export class AIService {
@@ -71,7 +71,7 @@ RECHAZA si: cables eléctricos (empresa distribuidora), cañerías de agua potab
 
 REGLA 4 — CLASIFICACIÓN:
 Solo si pasó las reglas anteriores, clasifica en UNA de estas categorías exactas:
-Pavimento, Veredas, Areas Verdes, Senaletica, Residuos, Mobiliario
+Pavimento, Veredas, Areas Verdes, Señaletica, Residuos, Mobiliario
 
 Descripción del ciudadano: "${descripcion}"
 
