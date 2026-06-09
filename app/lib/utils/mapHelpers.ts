@@ -1,3 +1,4 @@
+// app/lib/utils/mapHelpers.ts
 // Devuelve el color asociado al estado del reporte
 export const getColor = (estado: string): string => {
   switch (estado) {
