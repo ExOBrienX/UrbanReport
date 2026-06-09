@@ -58,6 +58,10 @@ export default function TecnicoPage() {
     if (status === 'unauthenticated') router.push('/acceso')
   }, [status, router])
 
+  const mostrarMensaje = (tipo: 'ok' | 'error', texto: string) => {
+    setMensaje({ tipo, texto })
+    setTimeout(() => setMensaje(null), 4000)
+  }
   /**
    * Carga la cola de tareas del tecnico desde el backend.
    * Incluye tareas disponibles de su especialidad y su tarea activa propia.
@@ -78,10 +82,7 @@ export default function TecnicoPage() {
     if (status === 'authenticated') cargarTareas()
   }, [status, cargarTareas])
 
-  const mostrarMensaje = (tipo: 'ok' | 'error', texto: string) => {
-    setMensaje({ tipo, texto })
-    setTimeout(() => setMensaje(null), 4000)
-  }
+  
 
   /**
    * Ejecuta una accion de estado sobre una tarea via PATCH.
