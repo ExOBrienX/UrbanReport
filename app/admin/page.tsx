@@ -25,13 +25,12 @@ function VistaPendiente({ nombre }: { nombre: string }) {
 }
 
 const TITULOS: Record<VistaAdmin, string> = {
-  dashboard:       'Dashboard general',
-  bandeja:         'Bandeja de revisión',
-  incidencias:     'Gestión de incidencias',
-  tecnicos:        'Gestión de técnicos',
-  'tarea-urgente': 'Insertar tarea urgente',
-  informe:         'Generar informe mensual',
-  configuracion:   'Configuración del sistema',
+  dashboard:     'Dashboard general',
+  bandeja:       'Bandeja de revisión',
+  incidencias:   'Gestión de incidencias',
+  tecnicos:      'Gestión de técnicos',
+  informe:       'Generar informe mensual',
+  configuracion: 'Configuración del sistema',
 }
 
 export default function AdminPage() {
@@ -72,7 +71,6 @@ export default function AdminPage() {
         nombreAdmin={session?.user?.nombre ?? 'Admin'}
         pendientesRevision={pendientesRevision}
       />
-
       <main className="ml-64 flex-1 min-h-screen">
         <div className="sticky top-0 z-30 bg-white border-b border-slate-200 px-8 py-4">
           <div className="flex items-center gap-2 text-sm text-slate-500">
@@ -81,13 +79,11 @@ export default function AdminPage() {
             <span className="text-slate-900 font-medium">{TITULOS[vistaActiva]}</span>
           </div>
         </div>
-
         <div className="p-8">
           {vistaActiva === 'dashboard'     && <AdminDashboard />}
           {vistaActiva === 'bandeja'       && <BandejaRevision onActualizarPendientes={actualizarPendientes} />}
           {vistaActiva === 'incidencias'   && <GestionIncidencias />}
           {vistaActiva === 'tecnicos'      && <GestionTecnicos />}
-          {vistaActiva === 'tarea-urgente' && <VistaPendiente nombre="Tarea urgente" />}
           {vistaActiva === 'informe'       && <VistaPendiente nombre="Informe mensual" />}
           {vistaActiva === 'configuracion' && <VistaPendiente nombre="Configuración" />}
         </div>

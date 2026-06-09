@@ -7,7 +7,6 @@ export type VistaAdmin =
   | 'bandeja'
   | 'incidencias'
   | 'tecnicos'
-  | 'tarea-urgente'
   | 'informe'
   | 'configuracion'
 
@@ -19,13 +18,12 @@ interface AdminSidebarProps {
 }
 
 const MENU_ITEMS: { id: VistaAdmin; label: string; icon: string }[] = [
-  { id: 'dashboard',      label: 'Dashboard',          icon: '⊞' },
-  { id: 'bandeja',        label: 'Bandeja de revisión', icon: '◉' },
-  { id: 'incidencias',    label: 'Incidencias',         icon: '📍' },
-  { id: 'tecnicos',       label: 'Técnicos',            icon: '👥' },
-  { id: 'tarea-urgente',  label: 'Tarea urgente',       icon: '⚡' },
-  { id: 'informe',        label: 'Generar informe',     icon: '📊' },
-  { id: 'configuracion',  label: 'Configuración',       icon: '⚙' },
+  { id: 'dashboard',    label: 'Dashboard',           icon: '⊞' },
+  { id: 'bandeja',      label: 'Bandeja de revisión', icon: '◉' },
+  { id: 'incidencias',  label: 'Incidencias',         icon: '📍' },
+  { id: 'tecnicos',     label: 'Técnicos',            icon: '👥' },
+  { id: 'informe',      label: 'Generar informe',     icon: '📊' },
+  { id: 'configuracion',label: 'Configuración',       icon: '⚙' },
 ]
 
 export default function AdminSidebar({ vistaActiva, onCambiarVista, nombreAdmin, pendientesRevision }: AdminSidebarProps) {
