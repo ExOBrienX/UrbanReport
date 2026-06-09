@@ -7,6 +7,7 @@ import dynamic from 'next/dynamic'
 import AdminSidebar, { VistaAdmin } from './components/AdminSidebar'
 import BandejaRevision from './components/BandejaRevision'
 import GestionIncidencias from './components/GestionIncidencias'
+import GestionTecnicos from './components/GestionTecnicos'
 
 const AdminDashboard = dynamic(() => import('./components/AdminDashboard'), {
   ssr: false,
@@ -16,7 +17,7 @@ const AdminDashboard = dynamic(() => import('./components/AdminDashboard'), {
 function VistaPendiente({ nombre }: { nombre: string }) {
   return (
     <div className="flex flex-col items-center justify-center h-64 space-y-3">
-      <p className="text-4xl">:construction:</p>
+      <p className="text-4xl">🚧</p>
       <p className="text-slate-600 font-medium">{nombre}</p>
       <p className="text-slate-400 text-sm">En construcción — próxima issue</p>
     </div>
@@ -82,13 +83,13 @@ export default function AdminPage() {
         </div>
 
         <div className="p-8">
-          {vistaActiva === 'dashboard'    && <AdminDashboard />}
-          {vistaActiva === 'bandeja'      && <BandejaRevision onActualizarPendientes={actualizarPendientes} />}
-          {vistaActiva === 'incidencias'  && <GestionIncidencias />}
-          {vistaActiva === 'tecnicos'     && <VistaPendiente nombre="Gestión de técnicos" />}
-          {vistaActiva === 'tarea-urgente'&& <VistaPendiente nombre="Tarea urgente" />}
-          {vistaActiva === 'informe'      && <VistaPendiente nombre="Informe mensual" />}
-          {vistaActiva === 'configuracion'&& <VistaPendiente nombre="Configuración" />}
+          {vistaActiva === 'dashboard'     && <AdminDashboard />}
+          {vistaActiva === 'bandeja'       && <BandejaRevision onActualizarPendientes={actualizarPendientes} />}
+          {vistaActiva === 'incidencias'   && <GestionIncidencias />}
+          {vistaActiva === 'tecnicos'      && <GestionTecnicos />}
+          {vistaActiva === 'tarea-urgente' && <VistaPendiente nombre="Tarea urgente" />}
+          {vistaActiva === 'informe'       && <VistaPendiente nombre="Informe mensual" />}
+          {vistaActiva === 'configuracion' && <VistaPendiente nombre="Configuración" />}
         </div>
       </main>
     </div>
