@@ -28,6 +28,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import ModalHistorialTareas from './ModalHistorialTareas'
+import { getNombreCategoria } from '../../lib/utils/mapHelpers'
 
 interface Especialidad {
   categoria: { id: number; nombre: string }
@@ -55,7 +56,7 @@ const CAT_COLORS: Record<string, string> = {
   'Pavimento':    'bg-slate-700 text-white',
   'Veredas':      'bg-blue-600 text-white',
   'Areas Verdes': 'bg-green-600 text-white',
-  'Senaletica':   'bg-amber-500 text-white',
+  'Señaletica':   'bg-amber-500 text-white',
   'Residuos':     'bg-orange-500 text-white',
   'Mobiliario':   'bg-purple-600 text-white',
 }
@@ -378,7 +379,7 @@ export default function GestionTecnicos() {
                   ) : (
                     tecnico.especialidades.map(e => (
                       <span key={e.categoria.id} className={`text-xs font-semibold px-2 py-0.5 rounded-full ${CAT_COLORS[e.categoria.nombre] ?? 'bg-slate-200 text-slate-700'}`}>
-                        {e.categoria.nombre}
+                        {getNombreCategoria(e.categoria.nombre)}
                       </span>
                     ))
                   )}
@@ -531,10 +532,10 @@ export default function GestionTecnicos() {
                       <span className={`w-5 h-5 rounded flex items-center justify-center text-xs font-bold flex-shrink-0 transition-all ${tieneEsp ? 'bg-slate-900 text-white' : 'border-2 border-slate-300'}`}>
                         {tieneEsp ? 'V' : ''}
                       </span>
-                      <span className={`text-sm font-semibold ${tieneEsp ? 'text-slate-900' : 'text-slate-500'}`}>{cat.nombre}</span>
+                      <span className={`text-sm font-semibold ${tieneEsp ? 'text-slate-900' : 'text-slate-500'}`}>{getNombreCategoria(cat.nombre)}</span>
                     </div>
                     <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${CAT_COLORS[cat.nombre] ?? 'bg-slate-200 text-slate-700'}`}>
-                      {cat.nombre}
+                      {getNombreCategoria(cat.nombre)}
                     </span>
                   </button>
                 )

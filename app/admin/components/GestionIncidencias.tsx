@@ -318,7 +318,6 @@ export default function GestionIncidencias() {
               const tecnico     = tareaActiva?.tecnico
               const dias        = diasSinAtencion(inc.creado_en)
               const prioridad   = Math.round(inc.puntaje_prioridad)
-              console.log(`Inc #${inc.id}`, inc.tareas) 
 
               // Puede asignar si: no hay tarea (pendiente) O hay tarea en cola sin tecnico
               const puedeAsignar = (inc.estado === 'pendiente' && !tareaActiva)
@@ -478,7 +477,7 @@ export default function GestionIncidencias() {
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-mono text-slate-400">Tarea #{tarea.id}</span>
                         <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${TAREA_ESTADO_CONFIG[tarea.estado] ?? 'bg-slate-100 text-slate-500'}`}>
-                          {tarea.estado}
+                          {{ asignada: 'Asignada', aceptada: 'Aceptada', en_curso: 'En curso', atrasada: 'Atrasada', completada: 'Completada', cancelada: 'Cancelada' }[tarea.estado] ?? tarea.estado}
                         </span>
                       </div>
                       {tarea.tecnico && (

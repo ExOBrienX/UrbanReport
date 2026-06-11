@@ -25,6 +25,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import dynamic from 'next/dynamic'
+import { getNombreCategoria } from '../../lib/utils/mapHelpers'
 
 // Carga dinamica del mapa — Leaflet no funciona en SSR
 const AdminMap = dynamic(() => import('./AdminMap'), {
@@ -267,9 +268,9 @@ export default function AdminDashboard() {
                 // Barra relativa al maximo de incidencias de cualquier categoria
                 const max = Math.max(...kpis.porCategoria.map(x => x.incidenciasActivas), 1)
                 return (
-                  <div key={c.nombre}>
+                  <div key={getNombreCategoria(c.nombre)}>
                     <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs text-slate-600">{c.nombre}</span>
+                      <span className="text-xs text-slate-600">{getNombreCategoria(c.nombre)}</span>
                       <span className="text-xs font-bold text-slate-900">{c.incidenciasActivas}</span>
                     </div>
                     <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
