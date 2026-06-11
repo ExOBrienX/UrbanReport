@@ -20,6 +20,7 @@
  */
 
 import { useEffect, useState } from 'react'
+import { getNombreCategoria } from '../../lib/utils/mapHelpers'
 
 interface Reporte {
   foto_url: string
@@ -31,7 +32,7 @@ interface Reporte {
 interface Tarea {
   id: number
   estado: string
-  foto_evidencia_url: string | null // foto subida por el tecnico al completar
+  foto_evidencia_url: string | null
   creado_en: string
   completada_en: string | null
   motivo_atraso: string | null
@@ -44,7 +45,7 @@ interface Tarea {
     latitud: string
     longitud: string
     categoria: { nombre: string }
-    reportes: Reporte[] // reporte ciudadano con foto y resumen IA
+    reportes: Reporte[]
   }
 }
 
@@ -69,6 +70,16 @@ const ESTADO_COLORS: Record<string, string> = {
   cancelada:  'bg-slate-100 text-slate-400',
 }
 
+// Etiquetas legibles para los estados de tarea
+const ESTADO_LABELS_TAREA: Record<string, string> = {
+  asignada:   'Asignada',
+  aceptada:   'Aceptada',
+  en_curso:   'En curso',
+  atrasada:   'Atrasada',
+  completada: 'Completada',
+  cancelada:  'Cancelada',
+}
+
 const FILTROS_ESTADO  = ['todas', 'completada', 'con_atraso', 'cancelada', 'en_curso', 'asignada']
 const FILTROS_PERIODO = ['todo', 'semana', 'mes']
 
@@ -81,10 +92,6 @@ const PERIODO_LABELS: Record<string, string> = {
   todo: 'Todo el tiempo', semana: 'Esta semana', mes: 'Este mes'
 }
 
-/**
- * Componente de foto que se expande al hacer clic.
- * Muestra la imagen en tamano completo sobre un overlay oscuro.
- */
 function FotoExpandible({ src, alt, className }: { src: string; alt: string; className?: string }) {
   const [expandida, setExpandida] = useState(false)
   return (
@@ -120,7 +127,6 @@ export default function ModalHistorialTareas({ tecnico, onCerrar }: Props) {
   const [filtroPeriodo, setFiltroPeriodo] = useState('todo')
   const [tareaDetalle, setTareaDetalle] = useState<Tarea | null>(null)
 
-  // Cargar historial completo del tecnico al abrir el modal
   useEffect(() => {
     const cargar = async () => {
       setLoading(true)
@@ -135,20 +141,12 @@ export default function ModalHistorialTareas({ tecnico, onCerrar }: Props) {
     cargar()
   }, [tecnico.id])
 
-  /**
-   * Filtro por estado — el filtro "con_atraso" usa motivo_atraso !== null
-   * para incluir tareas que tuvieron atraso aunque luego se completaron.
-   */
   const filtrarPorEstado = (tarea: Tarea) => {
     if (filtroEstado === 'todas') return true
     if (filtroEstado === 'con_atraso') return tarea.motivo_atraso !== null
     return tarea.estado === filtroEstado
   }
 
-  /**
-   * Filtro por periodo — compara la fecha de creacion de la tarea
-   * contra el rango seleccionado (semana = ultimos 7 dias, mes = mes actual).
-   */
   const filtrarPorPeriodo = (tarea: Tarea) => {
     if (filtroPeriodo === 'todo') return true
     const fecha = new Date(tarea.creado_en)
@@ -164,22 +162,17 @@ export default function ModalHistorialTareas({ tecnico, onCerrar }: Props) {
 
   const tareasFiltradas = tareas.filter(filtrarPorEstado).filter(filtrarPorPeriodo)
 
-  // Estadisticas calculadas sobre el total de tareas sin filtros
   const stats = {
-    total:      tareas.length,
+    total:       tareas.length,
     completadas: tareas.filter(t => t.estado === 'completada').length,
-    conAtraso:  tareas.filter(t => t.motivo_atraso !== null).length, // independiente del estado final
-    canceladas: tareas.filter(t => t.estado === 'cancelada').length,
+    conAtraso:   tareas.filter(t => t.motivo_atraso !== null).length,
+    canceladas:  tareas.filter(t => t.estado === 'cancelada').length,
   }
 
   const formatFecha = (fecha: string) => new Date(fecha).toLocaleDateString('es-CL', {
     day: '2-digit', month: 'short', year: 'numeric'
   })
 
-  /**
-   * Calcula la duracion real de la tarea en dias y horas.
-   * Retorna null si la tarea no tiene fecha de completado.
-   */
   const calcularDuracion = (tarea: Tarea) => {
     if (!tarea.completada_en) return null
     const diff = new Date(tarea.completada_en).getTime() - new Date(tarea.creado_en).getTime()
@@ -198,7 +191,6 @@ export default function ModalHistorialTareas({ tecnico, onCerrar }: Props) {
         className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col"
         onClick={e => e.stopPropagation()}
       >
-        {/* Header con avatar y datos del tecnico */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 flex-shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-slate-900 text-white flex items-center justify-center font-black text-sm flex-shrink-0">
@@ -213,16 +205,14 @@ export default function ModalHistorialTareas({ tecnico, onCerrar }: Props) {
         </div>
 
         <div className="flex flex-1 overflow-hidden">
-          {/* Panel izquierdo — estadisticas, filtros y tabla */}
           <div className={`flex flex-col ${tareaDetalle ? 'w-1/2 border-r border-slate-100' : 'w-full'} overflow-hidden`}>
 
-            {/* Estadisticas rapidas sobre el total sin filtros */}
             <div className="grid grid-cols-4 gap-3 px-6 py-4 bg-slate-50 border-b border-slate-100 flex-shrink-0">
               {[
-                { label: 'Total',      value: stats.total,       color: 'text-slate-900' },
+                { label: 'Total',       value: stats.total,       color: 'text-slate-900' },
                 { label: 'Completadas', value: stats.completadas, color: 'text-green-600' },
-                { label: 'Con atraso', value: stats.conAtraso,   color: 'text-amber-600' },
-                { label: 'Canceladas', value: stats.canceladas,  color: 'text-red-500' },
+                { label: 'Con atraso',  value: stats.conAtraso,   color: 'text-amber-600' },
+                { label: 'Canceladas',  value: stats.canceladas,  color: 'text-red-500' },
               ].map(s => (
                 <div key={s.label} className="text-center">
                   <p className={`text-2xl font-black ${s.color}`}>{s.value}</p>
@@ -231,7 +221,6 @@ export default function ModalHistorialTareas({ tecnico, onCerrar }: Props) {
               ))}
             </div>
 
-            {/* Filtros por estado y periodo */}
             <div className="px-6 py-3 border-b border-slate-100 space-y-2 flex-shrink-0">
               <div className="flex gap-1.5 flex-wrap">
                 {FILTROS_ESTADO.map(f => (
@@ -256,7 +245,6 @@ export default function ModalHistorialTareas({ tecnico, onCerrar }: Props) {
               </div>
             </div>
 
-            {/* Tabla de tareas filtradas */}
             <div className="flex-1 overflow-y-auto">
               {loading ? (
                 <div className="space-y-2 p-4">
@@ -268,7 +256,6 @@ export default function ModalHistorialTareas({ tecnico, onCerrar }: Props) {
                 </div>
               ) : (
                 <div className="divide-y divide-slate-100">
-                  {/* Cabecera de columnas sticky */}
                   <div className="grid grid-cols-12 gap-3 px-6 py-2 bg-slate-50 text-xs font-bold text-slate-400 uppercase tracking-wider sticky top-0">
                     <div className="col-span-1">#</div>
                     <div className="col-span-3">Categoria</div>
@@ -279,8 +266,8 @@ export default function ModalHistorialTareas({ tecnico, onCerrar }: Props) {
                   </div>
 
                   {tareasFiltradas.map(tarea => {
-                    const isSelected  = tareaDetalle?.id === tarea.id
-                    const tuvoAtraso  = tarea.motivo_atraso !== null
+                    const isSelected = tareaDetalle?.id === tarea.id
+                    const tuvoAtraso = tarea.motivo_atraso !== null
 
                     return (
                       <div
@@ -293,14 +280,13 @@ export default function ModalHistorialTareas({ tecnico, onCerrar }: Props) {
                         </div>
                         <div className="col-span-3">
                           <p className="text-xs font-semibold text-slate-800 truncate">
-                            {tarea.incidencia?.categoria?.nombre ?? '—'}
+                            {getNombreCategoria(tarea.incidencia?.categoria?.nombre ?? '—')}
                           </p>
-                          {/* Indicador de atraso visible aunque la tarea haya terminado como completada */}
                           {tuvoAtraso && <p className="text-xs text-amber-500">tuvo atraso</p>}
                         </div>
                         <div className="col-span-2">
                           <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${ESTADO_COLORS[tarea.estado] ?? 'bg-slate-100 text-slate-500'}`}>
-                            {tarea.estado}
+                            {ESTADO_LABELS_TAREA[tarea.estado] ?? tarea.estado}
                           </span>
                         </div>
                         <div className="col-span-3">
@@ -322,7 +308,6 @@ export default function ModalHistorialTareas({ tecnico, onCerrar }: Props) {
             </div>
           </div>
 
-          {/* Panel derecho — detalle de la tarea seleccionada */}
           {tareaDetalle && (
             <div className="w-1/2 overflow-y-auto">
               <div className="p-5 space-y-4">
@@ -333,7 +318,6 @@ export default function ModalHistorialTareas({ tecnico, onCerrar }: Props) {
                   <button onClick={() => setTareaDetalle(null)} className="text-slate-400 hover:text-slate-600 text-xs">X</button>
                 </div>
 
-                {/* Fotos lado a lado: reporte ciudadano y evidencia del tecnico */}
                 <div className="grid grid-cols-2 gap-2">
                   {tareaDetalle.incidencia?.reportes?.[0]?.foto_url && (
                     <div>
@@ -357,12 +341,11 @@ export default function ModalHistorialTareas({ tecnico, onCerrar }: Props) {
                   )}
                 </div>
 
-                {/* Metricas de la tarea */}
                 <div className="grid grid-cols-3 gap-2">
                   <div className="bg-slate-50 rounded-xl p-3 text-center">
                     <p className="text-xs text-slate-400 mb-1">Estado</p>
                     <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${ESTADO_COLORS[tareaDetalle.estado]}`}>
-                      {tareaDetalle.estado}
+                      {ESTADO_LABELS_TAREA[tareaDetalle.estado] ?? tareaDetalle.estado}
                     </span>
                   </div>
                   <div className="bg-slate-50 rounded-xl p-3 text-center">
@@ -377,7 +360,6 @@ export default function ModalHistorialTareas({ tecnico, onCerrar }: Props) {
                   </div>
                 </div>
 
-                {/* Descripcion del ciudadano — contexto del problema original */}
                 {tareaDetalle.incidencia?.reportes?.[0]?.descripcion && (
                   <div className="bg-slate-50 rounded-xl p-3">
                     <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Descripcion ciudadano</p>
@@ -385,7 +367,6 @@ export default function ModalHistorialTareas({ tecnico, onCerrar }: Props) {
                   </div>
                 )}
 
-                {/* Resumen tecnico generado por la IA al clasificar el reporte */}
                 {tareaDetalle.incidencia?.reportes?.[0]?.resumen_ia && (
                   <div className="bg-blue-50 border border-blue-100 rounded-xl p-3">
                     <p className="text-xs font-bold text-blue-400 uppercase tracking-wider mb-1">
@@ -400,7 +381,6 @@ export default function ModalHistorialTareas({ tecnico, onCerrar }: Props) {
                   </div>
                 )}
 
-                {/* Fechas de asignacion y completado */}
                 <div className="space-y-1.5 text-sm">
                   <div className="flex justify-between">
                     <span className="text-slate-400">Asignada</span>
@@ -414,7 +394,6 @@ export default function ModalHistorialTareas({ tecnico, onCerrar }: Props) {
                   )}
                 </div>
 
-                {/* Motivo de atraso registrado por el tecnico */}
                 {tareaDetalle.motivo_atraso && (
                   <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
                     <p className="text-xs font-bold text-amber-600 mb-1">Motivo de atraso</p>
@@ -422,7 +401,6 @@ export default function ModalHistorialTareas({ tecnico, onCerrar }: Props) {
                   </div>
                 )}
 
-                {/* Motivo de cancelacion registrado por el admin */}
                 {tareaDetalle.motivo_cancelacion && (
                   <div className="bg-red-50 border border-red-200 rounded-xl p-3">
                     <p className="text-xs font-bold text-red-600 mb-1">Motivo de cancelacion</p>
@@ -430,9 +408,8 @@ export default function ModalHistorialTareas({ tecnico, onCerrar }: Props) {
                   </div>
                 )}
 
-                {/* Enlace a Google Maps con las coordenadas de la incidencia */}
                 {tareaDetalle.incidencia?.latitud && (
-                 <a 
+                  <a
                     href={`https://www.google.com/maps?q=${tareaDetalle.incidencia.latitud},${tareaDetalle.incidencia.longitud}`}
                     target="_blank"
                     rel="noopener noreferrer"

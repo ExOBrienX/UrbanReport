@@ -59,3 +59,10 @@ export const getRelativeTime = (fecha: string): string => {
   if (diffDays < 7)  return `Hace ${diffDays} dia${diffDays > 1 ? 's' : ''}`
   return reportDate.toLocaleDateString('es-CL')
 }
+export const getNombreCategoria = (nombre: string): string => {
+  const NOMBRES: Record<string, string> = {
+    'Senaletica':   'Señaletica',
+    'Areas Verdes': 'Áreas Verdes',
+  }
+  return NOMBRES[nombre] ?? nombre
+}
