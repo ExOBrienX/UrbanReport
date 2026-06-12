@@ -4,21 +4,17 @@
  * Delega toda la lógica de negocio a TareaService (patrón Repository).
  *
  * PATCH /api/tasks/[id] — Cambia el estado de la tarea según la acción enviada.
- *   Acciones válidas: aceptar, iniciar, atraso, completar.
- *   La acción 'aceptar' usa updateMany atómico para evitar race conditions.
- *
- * POST /api/tasks/[id] — Sube foto de evidencia a Cloudflare R2 y completa la tarea.
+ * POST  /api/tasks/[id] — Sube foto de evidencia y completa la tarea.
  *
  * Usado por: app/tecnico/components/TareaDetalleSheet.tsx
- * Depende de: TareaService, NextAuth
+ * Depende de: TareaService, ResponseFactory, NextAuth
  */
-
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '../../../lib/auth'
 import { TareaService } from '../../../lib/services/TareaService'
+import { ResponseFactory } from '../../../lib/factories/ResponseFactory'
 
-// Traducción de errores semánticos del servicio a mensajes y códigos HTTP legibles
 const ERRORES: Record<string, { mensaje: string; status: number }> = {
   TAREA_NO_ENCONTRADA:       { mensaje: 'Tarea no encontrada', status: 404 },
   SIN_PERMISO:               { mensaje: 'No tienes permiso sobre esta tarea', status: 403 },
@@ -32,19 +28,13 @@ const ERRORES: Record<string, { mensaje: string; status: number }> = {
   FOTO_DEMASIADO_GRANDE:     { mensaje: 'La foto no puede superar 8MB', status: 400 },
 }
 
-// PATCH /api/tasks/[id] — cambiar estado de una tarea
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await getServerSession(authOptions)
-
-  if (!session) {
-    return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-  }
-  if (session.user.role !== 'tecnico') {
-    return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 })
-  }
+  if (!session) { const r = ResponseFactory.unauthorized(); return NextResponse.json(r.body, { status: r.status }) }
+  if (session.user.role !== 'tecnico') { const r = ResponseFactory.forbidden(); return NextResponse.json(r.body, { status: r.status }) }
 
   const tecnicoId = parseInt(session.user.id)
   const { id } = await params
@@ -52,68 +42,55 @@ export async function PATCH(
   const body = await request.json()
   const { accion, motivo_atraso } = body
 
-  // Validar acción en el route antes de llamar al servicio
   const acciones = ['aceptar', 'iniciar', 'atraso', 'completar']
   if (!accion || !acciones.includes(accion)) {
-    return NextResponse.json({ error: 'Accion invalida' }, { status: 400 })
+    const r = ResponseFactory.validacion('Accion invalida')
+    return NextResponse.json(r.body, { status: r.status })
   }
 
   try {
-    // Delegar toda la lógica de negocio al TareaService
-    // La validación de permisos, estado y transiciones ocurre en el servicio
     const tarea = await TareaService.cambiarEstado(tareaId, tecnicoId, accion, motivo_atraso)
-    return NextResponse.json({ success: true, tarea }, { status: 200 })
+    const r = ResponseFactory.success({ tarea })
+    return NextResponse.json(r.body, { status: r.status })
   } catch (error: any) {
-    // Traducir errores semánticos del servicio a respuestas HTTP comprensibles
-    const err = ERRORES[error.message]
-    if (err) return NextResponse.json({ error: err.mensaje }, { status: err.status })
-
+    const r = ResponseFactory.serviceError(ERRORES, error.message)
     console.error('Error actualizando tarea:', error)
-    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
+    return NextResponse.json(r.body, { status: r.status })
   }
 }
 
-// POST /api/tasks/[id] — subir foto de evidencia y completar la tarea
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await getServerSession(authOptions)
-
-  if (!session) {
-    return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-  }
-  if (session.user.role !== 'tecnico') {
-    return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 })
-  }
+  if (!session) { const r = ResponseFactory.unauthorized(); return NextResponse.json(r.body, { status: r.status }) }
+  if (session.user.role !== 'tecnico') { const r = ResponseFactory.forbidden(); return NextResponse.json(r.body, { status: r.status }) }
 
   const tecnicoId = parseInt(session.user.id)
   const { id } = await params
   const tareaId = parseInt(id)
-
   const formData = await request.formData()
   const foto = formData.get('foto') as File | null
 
-  // La foto es obligatoria — sin evidencia no se puede completar una tarea
   if (!foto) {
-    return NextResponse.json({ error: 'La foto de evidencia es obligatoria' }, { status: 400 })
+    const r = ResponseFactory.validacion('La foto de evidencia es obligatoria')
+    return NextResponse.json(r.body, { status: r.status })
   }
 
-  // Validar tipo de archivo en el route antes de enviarlo al servicio
   const tiposPermitidos = ['image/jpeg', 'image/png', 'image/webp']
   if (!tiposPermitidos.includes(foto.type)) {
-    return NextResponse.json({ error: 'Solo se permiten imagenes JPG, PNG o WebP' }, { status: 400 })
+    const r = ResponseFactory.validacion('Solo se permiten imagenes JPG, PNG o WebP')
+    return NextResponse.json(r.body, { status: r.status })
   }
 
   try {
-    // El servicio sube la foto a R2 y actualiza el estado de la tarea e incidencia
     const { tarea, fotoUrl } = await TareaService.completarConEvidencia(tareaId, tecnicoId, foto)
-    return NextResponse.json({ success: true, tarea, foto_url: fotoUrl }, { status: 200 })
+    const r = ResponseFactory.success({ tarea, foto_url: fotoUrl })
+    return NextResponse.json(r.body, { status: r.status })
   } catch (error: any) {
-    const err = ERRORES[error.message]
-    if (err) return NextResponse.json({ error: err.mensaje }, { status: err.status })
-
+    const r = ResponseFactory.serviceError(ERRORES, error.message)
     console.error('Error subiendo evidencia:', error)
-    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
+    return NextResponse.json(r.body, { status: r.status })
   }
 }
