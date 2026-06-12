@@ -130,7 +130,7 @@ export async function POST(request: NextRequest) {
     } catch (error) {
       console.error('Error en IA:', error)
       // Fallo tecnico de la IA — el reporte queda en pendiente_revision para revision manual
-      const r = ResponseFactory.fallo_ia()
+      const r = ResponseFactory.falloIA()
       return NextResponse.json(r.body, { status: r.status })
     }
 

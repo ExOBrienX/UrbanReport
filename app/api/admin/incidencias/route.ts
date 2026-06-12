@@ -5,7 +5,8 @@
  * GET /api/admin/incidencias — devuelve todas las incidencias no completadas,
  *   ordenadas por puntaje de prioridad descendente.
  *   Incluye la tarea activa mas reciente con su tecnico asignado,
- *   y el reporte ciudadano mas reciente con foto y descripcion.
+ *   y todos los reportes ciudadanos ordenados del mas antiguo al mas reciente
+ *   para que el admin pueda ver el historial completo de reportes duplicados.
  *
  *   Solo incluye incidencias con reportes ciudadanos reales (foto_url no vacia),
  *   excluyendo las urgentes creadas por el admin que tienen su propio endpoint.
@@ -28,27 +29,24 @@ export async function GET() {
   const incidencias = await prisma.incidencia.findMany({
     where: {
       estado: { not: 'completado' },
-      // Solo incidencias con reporte ciudadano real — excluye urgentes del admin
       reportes: { some: { foto_url: { not: '' } } }
     },
     include: {
       categoria: true,
       tareas: {
-        // Solo la tarea activa mas reciente — excluye canceladas
         where: { estado: { not: 'cancelada' } },
         include: { tecnico: { select: { id: true, nombre: true } } },
         orderBy: { creado_en: 'desc' },
         take: 1
       },
+      // Todos los reportes ordenados del original al mas reciente
       reportes: {
-        // Solo el reporte mas reciente con foto ciudadana
         where: { foto_url: { not: '' } },
-        take: 1,
-        orderBy: { creado_en: 'desc' },
-        select: { descripcion: true, foto_url: true }
+        orderBy: { creado_en: 'asc' },
+        select: { id: true, descripcion: true, foto_url: true, creado_en: true }
       }
     },
-    orderBy: { puntaje_prioridad: 'desc' } // mayor prioridad primero
+    orderBy: { puntaje_prioridad: 'desc' }
   })
 
   return NextResponse.json({ success: true, incidencias }, { status: 200 })

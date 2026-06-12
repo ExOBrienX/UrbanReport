@@ -1,23 +1,13 @@
 /**
  * app/api/admin/tecnicos/[id]/route.ts — Edicion y cambio de estado de un tecnico.
- * Solo accesible para usuarios con rol 'admin'.
- * Delega la logica de negocio a UsuarioService (patron Repository).
- *
- * PATCH /api/admin/tecnicos/[id] — opera segun la accion enviada en el body:
- *   { accion: 'editar',     nombre?, email?, telefono?, password? }
- *   { accion: 'desactivar' } — bloquea acceso y recepcion de tareas
- *   { accion: 'activar'   } — restaura acceso del tecnico
- *
- * Usado por: app/admin/components/GestionTecnicos.tsx
- * Depende de: UsuarioService, NextAuth
+ * Depende de: UsuarioService, ResponseFactory, NextAuth
  */
-
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '../../../../lib/auth'
 import { UsuarioService } from '../../../../lib/services/UsuarioService'
+import { ResponseFactory } from '../../../../lib/factories/ResponseFactory'
 
-// Traduccion de errores del servicio a mensajes legibles para el cliente
 const ERRORES: Record<string, { mensaje: string; status: number }> = {
   TECNICO_NO_ENCONTRADO:        { mensaje: 'Tecnico no encontrado', status: 404 },
   EMAIL_YA_EXISTE:              { mensaje: 'El email ya esta registrado', status: 400 },
@@ -26,43 +16,31 @@ const ERRORES: Record<string, { mensaje: string; status: number }> = {
   TECNICO_TIENE_TAREAS_ACTIVAS: { mensaje: 'El tecnico tiene tareas activas, cancelalas primero', status: 400 },
 }
 
-// PATCH /api/admin/tecnicos/[id] — editar, activar o desactivar un tecnico
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-  if (session.user.role !== 'admin') return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 })
+  if (!session) { const r = ResponseFactory.unauthorized(); return NextResponse.json(r.body, { status: r.status }) }
+  if (session.user.role !== 'admin') { const r = ResponseFactory.forbidden(); return NextResponse.json(r.body, { status: r.status }) }
 
   const { id } = await params
   const tecnicoId = parseInt(id)
-  const body = await request.json()
-  const { accion, ...datos } = body
+  const { accion, ...datos } = await request.json()
 
-  // Validar accion antes de llamar al servicio
   if (!accion || !['editar', 'desactivar', 'activar'].includes(accion)) {
-    return NextResponse.json({ error: 'Accion invalida' }, { status: 400 })
+    const r = ResponseFactory.validacion('Accion invalida')
+    return NextResponse.json(r.body, { status: r.status })
   }
 
   try {
     let resultado
+    if (accion === 'editar') resultado = await UsuarioService.editar(tecnicoId, datos)
+    else if (accion === 'desactivar') resultado = await UsuarioService.desactivar(tecnicoId)
+    else resultado = await UsuarioService.activar(tecnicoId)
 
-    if (accion === 'editar') {
-      // datos contiene los campos a actualizar — el servicio hashea la password si viene
-      resultado = await UsuarioService.editar(tecnicoId, datos)
-    } else if (accion === 'desactivar') {
-      // El servicio verifica que no tenga tareas activas antes de desactivar
-      resultado = await UsuarioService.desactivar(tecnicoId)
-    } else {
-      resultado = await UsuarioService.activar(tecnicoId)
-    }
-
-    return NextResponse.json({ success: true, tecnico: resultado }, { status: 200 })
+    const r = ResponseFactory.success({ tecnico: resultado })
+    return NextResponse.json(r.body, { status: r.status })
   } catch (error: any) {
-    const err = ERRORES[error.message]
-    if (err) return NextResponse.json({ error: err.mensaje }, { status: err.status })
+    const r = ResponseFactory.serviceError(ERRORES, error.message)
     console.error('Error actualizando tecnico:', error)
-    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
+    return NextResponse.json(r.body, { status: r.status })
   }
 }

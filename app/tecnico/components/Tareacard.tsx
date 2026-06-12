@@ -49,15 +49,7 @@ export interface Tarea {
   }
 }
 
-// Iconos por categoria para identificacion rapida visual en terreno
-const CATEGORIA_ICONS: Record<string, string> = {
-  'Pavimento':    '🛣️',
-  'Veredas':      '🚶',
-  'Areas Verdes': '🌳',
-  'Senaletica':   '🚦',
-  'Residuos':     '🗑️',
-  'Mobiliario':   '🪑',
-}
+
 
 /**
  * Retorna la configuracion visual (label, colores, borde) segun el puntaje de prioridad.
@@ -88,7 +80,6 @@ export default function TareaCard({ tarea, tecnicoId, onVerDetalle, onAceptar, a
   const reporte  = tarea.incidencia.reportes[0]
   const puntaje  = Math.round(tarea.incidencia.puntaje_prioridad)
   const prioridad = PRIORIDAD_CONFIG(puntaje)
-  const icono    = CATEGORIA_ICONS[tarea.incidencia.categoria.nombre] ?? '📍'
   // esMia indica que esta tarea ya fue aceptada por este tecnico
   const esMia    = tarea.tecnico_id === tecnicoId
 
@@ -102,7 +93,6 @@ export default function TareaCard({ tarea, tecnicoId, onVerDetalle, onAceptar, a
         {/* Header: categoria, indicador de tarea propia y puntaje */}
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-2">
-            <span className="text-lg">{icono}</span>
             <div>
               <p className="text-sm font-semibold text-slate-900">
                 {tarea.incidencia.categoria.nombre}

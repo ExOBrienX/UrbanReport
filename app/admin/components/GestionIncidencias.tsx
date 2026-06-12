@@ -8,7 +8,7 @@
  *
  * Funcionalidades:
  *   - Tabla filtrable por estado (todas, pendiente, asignado, en_curso)
- *   - Panel lateral de detalle con foto, metricas, tarea y ubicacion
+ *   - Panel lateral de detalle con todos los reportes ciudadanos, metricas, tarea y ubicacion
  *   - Modal de asignacion — carga tecnicos con especialidad en la categoria
  *   - Modal de cancelacion — requiere motivo obligatorio (RF-19)
  *
@@ -36,6 +36,14 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { getCalle } from '../../lib/utils/geo'
+import { getNombreCategoria } from '../../lib/utils/mapHelpers'
+
+interface Reporte {
+  id: number
+  descripcion: string
+  foto_url: string
+  creado_en: string
+}
 
 interface Incidencia {
   id: number
@@ -52,7 +60,7 @@ interface Incidencia {
     motivo_atraso: string | null
     tecnico: { id: number; nombre: string } | null
   }[]
-  reportes: { descripcion: string; foto_url: string }[]
+  reportes: Reporte[]
 }
 
 interface Tecnico {
@@ -81,6 +89,11 @@ const TAREA_ESTADO_CONFIG: Record<string, string> = {
   cancelada:  'bg-slate-100 text-slate-400',
 }
 
+const TAREA_ESTADO_LABELS: Record<string, string> = {
+  asignada: 'Asignada', aceptada: 'Aceptada', en_curso: 'En curso',
+  atrasada: 'Atrasada', completada: 'Completada', cancelada: 'Cancelada'
+}
+
 const FILTROS = ['todos', 'pendiente', 'asignado', 'en_curso']
 const FILTRO_LABELS: Record<string, string> = {
   todos: 'Todas', pendiente: 'Sin asignar', asignado: 'Asignado', en_curso: 'En curso'
@@ -89,8 +102,6 @@ const FILTRO_LABELS: Record<string, string> = {
 /**
  * Determina el estado visual de una incidencia para el badge de la tabla.
  * Distingue entre "En cola" (tarea sin tecnico) y "Asignado" (tecnico especifico).
- * El campo incidencia.estado solo tiene 'asignado', 'pendiente', etc.,
- * pero desde el frontend diferenciamos segun si la tarea tiene tecnico_id o no.
  */
 function getEstadoVisual(inc: Incidencia): { label: string; color: string; dot: string } {
   if (inc.estado === 'asignado' && inc.tareas[0] && !inc.tareas[0].tecnico) {
@@ -105,6 +116,7 @@ export default function GestionIncidencias() {
   const [filtro, setFiltro] = useState('todos')
   const [incidenciaSeleccionada, setIncidenciaSeleccionada] = useState<Incidencia | null>(null)
   const [callePanel, setCallePanel] = useState<string>('Calculando...')
+  const [reporteExpandido, setReporteExpandido] = useState<number | null>(null)
 
   // Estado del modal de asignacion de tecnico
   const [showModalAsignar, setShowModalAsignar] = useState(false)
@@ -121,7 +133,7 @@ export default function GestionIncidencias() {
   const [procesando, setProcesando] = useState(false)
   const [mensaje, setMensaje] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null)
 
-  // Cache de calles por incidencia_id — evita llamadas repetidas al abrir el mismo panel
+  // Cache de calles por incidencia_id
   const callesCache = useRef<Record<number, string>>({})
 
   const mostrarMensaje = (tipo: 'ok' | 'error', texto: string) => {
@@ -129,10 +141,6 @@ export default function GestionIncidencias() {
     setTimeout(() => setMensaje(null), 4000)
   }
 
-  /**
-   * Carga las incidencias activas ordenadas por prioridad.
-   * No carga las calles aqui — se obtienen al abrir el panel lateral.
-   */
   const cargar = useCallback(async () => {
     setLoading(true)
     try {
@@ -146,11 +154,9 @@ export default function GestionIncidencias() {
 
   useEffect(() => { cargar() }, [cargar])
 
-  /**
-   * Abre el panel lateral de detalle y carga la direccion si no esta en cache.
-   */
   const abrirPanel = async (inc: Incidencia) => {
     setIncidenciaSeleccionada(inc)
+    setReporteExpandido(null)
     setCallePanel('Calculando...')
     const calle = callesCache.current[inc.id]
       ?? await getCalle(parseFloat(inc.latitud), parseFloat(inc.longitud))
@@ -158,9 +164,6 @@ export default function GestionIncidencias() {
     setCallePanel(calle)
   }
 
-  /**
-   * Abre el modal de asignacion y carga tecnicos con especialidad en la categoria.
-   */
   const abrirModalAsignar = async (inc: Incidencia) => {
     setIncidenciaAsignar(inc)
     setTecnicoSeleccionado(null)
@@ -173,19 +176,10 @@ export default function GestionIncidencias() {
     if (data.success) setTecnicosDisponibles(data.tecnicos)
   }
 
-  /**
-   * Asigna el tecnico seleccionado a la incidencia.
-   *
-   * Caso 1 — Sin tarea (pendiente): crea tarea directamente con incidenciaId.
-   * Caso 2 — En cola (tarea sin tecnico): cancela la tarea en cola primero
-   *   para que el endpoint pueda crear una nueva tarea con el tecnico elegido.
-   *   Sin este paso, el endpoint rechazaria con YA_TIENE_TAREA_ACTIVA.
-   */
   const handleAsignarTecnico = async () => {
     if (!incidenciaAsignar || !tecnicoSeleccionado) return
     setProcesandoAsignacion(true)
     try {
-      // Si hay tarea en cola sin tecnico, cancelarla primero
       const tareaEnCola = incidenciaAsignar.tareas[0]
       if (tareaEnCola && !tareaEnCola.tecnico) {
         await fetch(`/api/admin/tareas/${tareaEnCola.id}`, {
@@ -218,10 +212,6 @@ export default function GestionIncidencias() {
     }
   }
 
-  /**
-   * Cancela la tarea con el motivo ingresado.
-   * La incidencia vuelve a estado 'pendiente' automaticamente en el servicio.
-   */
   const handleCancelarTarea = async () => {
     if (!tareaACancelar || !motivoCancelacion.trim()) return
     setProcesando(true)
@@ -319,7 +309,6 @@ export default function GestionIncidencias() {
               const dias        = diasSinAtencion(inc.creado_en)
               const prioridad   = Math.round(inc.puntaje_prioridad)
 
-              // Puede asignar si: no hay tarea (pendiente) O hay tarea en cola sin tecnico
               const puedeAsignar = (inc.estado === 'pendiente' && !tareaActiva)
                 || (inc.estado === 'asignado' && tareaActiva && !tecnico)
 
@@ -332,7 +321,7 @@ export default function GestionIncidencias() {
                     <span className="text-sm font-mono text-slate-400">#{inc.id}</span>
                   </div>
                   <div className="col-span-2">
-                    <span className="text-sm font-semibold text-slate-800">{inc.categoria.nombre}</span>
+                    <span className="text-sm font-semibold text-slate-800">{getNombreCategoria(inc.categoria.nombre)}</span>
                   </div>
                   <div className="col-span-2">
                     <span className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full w-fit ${estadoConf.color}`}>
@@ -366,7 +355,6 @@ export default function GestionIncidencias() {
                     </span>
                   </div>
                   <div className="col-span-2 flex justify-end gap-2" onClick={e => e.stopPropagation()}>
-                    {/* Asignar: disponible si no hay tarea O si la tarea esta en cola sin tecnico */}
                     {puedeAsignar && (
                       <button
                         onClick={() => abrirModalAsignar(inc)}
@@ -404,20 +392,17 @@ export default function GestionIncidencias() {
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 sticky top-0 bg-white z-10">
               <div>
                 <h3 className="text-base font-bold text-slate-900">Incidencia #{incidenciaSeleccionada.id}</h3>
-                <p className="text-xs text-slate-400">{incidenciaSeleccionada.categoria.nombre}</p>
+                <p className="text-xs text-slate-400">{getNombreCategoria(incidenciaSeleccionada.categoria.nombre)}</p>
               </div>
               <button onClick={() => setIncidenciaSeleccionada(null)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-400">X</button>
             </div>
 
             <div className="p-6 space-y-5">
-              {incidenciaSeleccionada.reportes[0] && (
-                <img src={incidenciaSeleccionada.reportes[0].foto_url} alt="Reporte" className="w-full h-48 object-cover rounded-2xl" />
-              )}
 
+              {/* Metricas */}
               <div className="grid grid-cols-3 gap-3">
                 <div className="bg-slate-50 rounded-xl p-3 text-center">
                   <p className="text-xs text-slate-400 mb-1">Estado</p>
-                  {/* Badge de estado con logica En cola / Asignado */}
                   <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${getEstadoVisual(incidenciaSeleccionada).color}`}>
                     {getEstadoVisual(incidenciaSeleccionada).label}
                   </span>
@@ -434,13 +419,7 @@ export default function GestionIncidencias() {
                 </div>
               </div>
 
-              {incidenciaSeleccionada.reportes[0] && (
-                <div className="bg-slate-50 rounded-xl p-4">
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Descripcion ciudadano</p>
-                  <p className="text-sm text-slate-700">{incidenciaSeleccionada.reportes[0].descripcion}</p>
-                </div>
-              )}
-
+              {/* Fechas */}
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-slate-400">Creada</span>
@@ -458,7 +437,53 @@ export default function GestionIncidencias() {
                 </div>
               </div>
 
-              {/* Boton asignar — visible si sin tarea O en cola sin tecnico */}
+              {/* Reportes ciudadanos — todos los reportes asociados a esta incidencia */}
+              <div>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">
+                  Reportes ciudadanos ({incidenciaSeleccionada.reportes.length})
+                </p>
+                <div className="space-y-2">
+                  {incidenciaSeleccionada.reportes.map((reporte, idx) => {
+                    const isExpanded = reporteExpandido === reporte.id
+                    const esOriginal = idx === 0
+                    return (
+                      <div key={reporte.id} className="border border-slate-200 rounded-2xl overflow-hidden">
+                        {/* Header del reporte — clickeable para expandir */}
+                        <button
+                          className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-slate-50 transition-colors"
+                          onClick={() => setReporteExpandido(isExpanded ? null : reporte.id)}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-mono text-slate-400">#{idx + 1}</span>
+                            {esOriginal && (
+                              <span className="text-xs font-semibold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Original</span>
+                            )}
+                            {!esOriginal && (
+                              <span className="text-xs font-semibold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">Duplicado</span>
+                            )}
+                            <span className="text-xs text-slate-400">{formatFecha(reporte.creado_en)}</span>
+                          </div>
+                          <span className={`text-slate-400 text-xs transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}>▼</span>
+                        </button>
+
+                        {/* Detalle expandible */}
+                        {isExpanded && (
+                          <div className="px-4 pb-4 space-y-3 border-t border-slate-100">
+                            <img
+                              src={reporte.foto_url}
+                              alt={`Reporte #${idx + 1}`}
+                              className="w-full h-40 object-cover rounded-xl mt-3"
+                            />
+                            <p className="text-sm text-slate-700">{reporte.descripcion}</p>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Boton asignar */}
               {(incidenciaSeleccionada.estado === 'pendiente' && incidenciaSeleccionada.tareas.length === 0)
                 || (incidenciaSeleccionada.estado === 'asignado' && incidenciaSeleccionada.tareas[0] && !incidenciaSeleccionada.tareas[0].tecnico) ? (
                 <button
@@ -469,6 +494,7 @@ export default function GestionIncidencias() {
                 </button>
               ) : null}
 
+              {/* Tarea asignada */}
               {incidenciaSeleccionada.tareas.length > 0 && (
                 <div>
                   <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Tarea asignada</p>
@@ -477,7 +503,7 @@ export default function GestionIncidencias() {
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-mono text-slate-400">Tarea #{tarea.id}</span>
                         <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${TAREA_ESTADO_CONFIG[tarea.estado] ?? 'bg-slate-100 text-slate-500'}`}>
-                          {{ asignada: 'Asignada', aceptada: 'Aceptada', en_curso: 'En curso', atrasada: 'Atrasada', completada: 'Completada', cancelada: 'Cancelada' }[tarea.estado] ?? tarea.estado}
+                          {TAREA_ESTADO_LABELS[tarea.estado] ?? tarea.estado}
                         </span>
                       </div>
                       {tarea.tecnico && (
@@ -488,7 +514,6 @@ export default function GestionIncidencias() {
                           <span className="text-sm font-medium text-slate-700">{tarea.tecnico.nombre}</span>
                         </div>
                       )}
-                      {/* Tarea en cola sin tecnico — informar al admin */}
                       {!tarea.tecnico && (
                         <p className="text-xs text-purple-600 font-medium">Esperando en cola — ningun tecnico la ha aceptado aun</p>
                       )}
@@ -533,13 +558,12 @@ export default function GestionIncidencias() {
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 flex-shrink-0">
               <div>
                 <h3 className="text-base font-bold text-slate-900">Asignar tecnico</h3>
-                <p className="text-xs text-slate-400">Incidencia #{incidenciaAsignar.id} — {incidenciaAsignar.categoria.nombre}</p>
+                <p className="text-xs text-slate-400">Incidencia #{incidenciaAsignar.id} — {getNombreCategoria(incidenciaAsignar.categoria.nombre)}</p>
               </div>
               <button onClick={() => setShowModalAsignar(false)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-400">X</button>
             </div>
 
             <div className="flex-1 overflow-y-auto p-6 space-y-4">
-              {/* Aviso cuando se va a reasignar una tarea en cola */}
               {incidenciaAsignar.tareas[0] && !incidenciaAsignar.tareas[0].tecnico && (
                 <div className="bg-purple-50 border border-purple-200 rounded-xl px-4 py-3">
                   <p className="text-xs text-purple-700 font-medium">
@@ -551,7 +575,7 @@ export default function GestionIncidencias() {
 
               {tecnicosDisponibles.length === 0 ? (
                 <div className="text-center py-10 bg-slate-50 rounded-2xl">
-                  <p className="text-slate-500 font-medium">No hay tecnicos disponibles con especialidad en {incidenciaAsignar.categoria.nombre}</p>
+                  <p className="text-slate-500 font-medium">No hay tecnicos disponibles con especialidad en {getNombreCategoria(incidenciaAsignar.categoria.nombre)}</p>
                 </div>
               ) : (
                 <div className="space-y-2">
