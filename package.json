@@ -13,6 +13,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.96.0",
     "@aws-sdk/client-s3": "^3.1045.0",
+    "@ducanh2912/next-pwa": "^10.2.9",
     "@prisma/client": "^6.19.3",
     "bcryptjs": "^3.0.3",
     "leaflet": "^1.9.4",

@@ -3,15 +3,16 @@
  *
  * Define la estructura HTML base que envuelve todas las paginas.
  * Configura las fuentes globales (Geist Sans y Geist Mono), los metadatos
- * del sitio y el proveedor de sesion de NextAuth.
+ * del sitio (incluyendo manifest PWA e iconos) y el proveedor de sesion
+ * de NextAuth.
  *
  * Providers envuelve toda la app con SessionProvider, lo que permite
  * acceder a useSession() desde cualquier componente cliente sin prop drilling.
  *
- * Depende de: Providers, next/font/google
+ * Depende de: Providers, next/font/google, public/manifest.json
  */
 
-import type { Metadata } from "next"
+import type { Metadata, Viewport } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
 import "./globals.css"
 import Providers from "./components/Provider"
@@ -31,6 +32,28 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "UrbanReport",
   description: "Sistema de reportes urbanos municipales de Talca",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "UrbanReport",
+  },
+  icons: {
+    icon: [
+      { url: "/favicon-32.png", sizes: "32x32", type: "image/png" },
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+    ],
+    apple: [
+      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+    ],
+  },
+}
+
+export const viewport: Viewport = {
+  themeColor: "#0A0F1E",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
 }
 
 export default function RootLayout({
