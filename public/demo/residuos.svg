@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" width="640" height="360">
+  <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e2e8f0"/><stop offset="1" stop-color="#a8a29e"/></linearGradient></defs>
+  <rect width="640" height="360" fill="url(#g)"/>
+  <rect x="0" y="262" width="640" height="38" fill="#78716c"/><g fill="#1c1917"><path d="M180 262 q-10 -70 40 -78 q50 8 40 78 z"/><path d="M270 262 q-14 -90 50 -100 q64 10 50 100 z"/><path d="M390 262 q-8 -58 34 -64 q42 6 34 64 z"/></g><g fill="#44403c"><rect x="212" y="170" width="14" height="16"/><rect x="312" y="148" width="16" height="18"/><rect x="418" y="186" width="12" height="14"/></g><rect x="470" y="238" width="60" height="24" fill="#a16207"/>
+  <rect x="0" y="300" width="640" height="60" fill="#0f172a" opacity=".72"/>
+  <text x="24" y="338" font-family="system-ui,Segoe UI,Arial,sans-serif" font-size="24" font-weight="700" fill="#fff">Residuos</text>
+  <text x="616" y="337" text-anchor="end" font-family="system-ui,Segoe UI,Arial,sans-serif" font-size="16" fill="#cbd5e1">Imagen de ejemplo</text>
+</svg>

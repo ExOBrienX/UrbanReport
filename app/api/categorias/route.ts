@@ -12,9 +12,13 @@
 
 import { NextResponse } from 'next/server'
 import { prisma } from '../../lib/prisma'
+import { DEMO_MODE, CATEGORIAS_DEMO } from '../../lib/demo'
 
 // GET /api/categorias — retorna todas las categorias activas con id y nombre
 export async function GET() {
+  // Modo demo — categorias fijas, sin consultar la BD
+  if (DEMO_MODE) return NextResponse.json({ categorias: CATEGORIAS_DEMO })
+
   const categorias = await prisma.categoria.findMany({
     where: { activo: true },        // excluir categorias desactivadas
     select: { id: true, nombre: true }, // solo los campos necesarios para los selectores

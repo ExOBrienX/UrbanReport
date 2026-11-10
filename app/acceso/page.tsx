@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { signIn, getSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
+import { DEMO_MODE } from '../lib/demo'
 
 export default function AccesoPage() {
   const router = useRouter()
@@ -12,6 +13,9 @@ export default function AccesoPage() {
   const [message, setMessage] = useState('')
 
   const handleLogin = async () => {
+    // En modo demo no hay BD contra la cual validar credenciales
+    if (DEMO_MODE) return
+
     if (!email || !password) {
       setStatus('error')
       setMessage('Ingresa tu correo y contraseña.')
@@ -62,6 +66,13 @@ export default function AccesoPage() {
         </div>
 
         <div className="space-y-4 p-6 pt-0">
+          {DEMO_MODE && (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              Acceso desactivado: este sitio es la demo de un proyecto académico
+              finalizado y no tiene base de datos activa.
+            </div>
+          )}
+
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">
               Correo electrónico
@@ -93,7 +104,7 @@ export default function AccesoPage() {
           <button
             type="button"
             onClick={handleLogin}
-            disabled={status === 'loading'}
+            disabled={status === 'loading' || DEMO_MODE}
             className="w-full rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-400"
           >
             {status === 'loading' ? 'Validando...' : 'Ingresar →'}

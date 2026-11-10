@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" width="640" height="360">
+  <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#bae6fd"/><stop offset="1" stop-color="#7dd3fc"/></linearGradient></defs>
+  <rect width="640" height="360" fill="url(#g)"/>
+  <rect x="150" y="270" width="340" height="14" fill="#64748b"/><g transform="rotate(62 320 270)"><rect x="312" y="80" width="16" height="190" fill="#475569"/><polygon points="320,20 362,38 380,80 362,122 320,140 278,122 260,80 278,38" fill="#dc2626" stroke="#fff" stroke-width="6"/><rect x="290" y="72" width="60" height="16" fill="#fff"/></g>
+  <rect x="0" y="300" width="640" height="60" fill="#0f172a" opacity=".72"/>
+  <text x="24" y="338" font-family="system-ui,Segoe UI,Arial,sans-serif" font-size="24" font-weight="700" fill="#fff">Señalética</text>
+  <text x="616" y="337" text-anchor="end" font-family="system-ui,Segoe UI,Arial,sans-serif" font-size="16" fill="#cbd5e1">Imagen de ejemplo</text>
+</svg>
