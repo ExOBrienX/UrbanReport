@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" width="640" height="360">
+  <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#cbd5e1"/><stop offset="1" stop-color="#94a3b8"/></linearGradient></defs>
+  <rect width="640" height="360" fill="url(#g)"/>
+  <g stroke="#64748b" stroke-width="4" fill="#e2e8f0"><rect x="60" y="150" width="130" height="130"/><rect x="190" y="150" width="130" height="130"/><rect x="450" y="150" width="130" height="130"/></g><polygon points="320,280 320,168 452,132 452,280" fill="#f1f5f9" stroke="#64748b" stroke-width="4"/><path d="M330 270 L380 200 L360 190 L430 150" stroke="#475569" stroke-width="5" fill="none"/>
+  <rect x="0" y="300" width="640" height="60" fill="#0f172a" opacity=".72"/>
+  <text x="24" y="338" font-family="system-ui,Segoe UI,Arial,sans-serif" font-size="24" font-weight="700" fill="#fff">Veredas</text>
+  <text x="616" y="337" text-anchor="end" font-family="system-ui,Segoe UI,Arial,sans-serif" font-size="16" fill="#cbd5e1">Imagen de ejemplo</text>
+</svg>

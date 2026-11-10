@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" width="640" height="360">
+  <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#bbf7d0"/><stop offset="1" stop-color="#86efac"/></linearGradient></defs>
+  <rect width="640" height="360" fill="url(#g)"/>
+  <rect x="0" y="250" width="640" height="50" fill="#16a34a"/><rect x="300" y="130" width="34" height="130" fill="#92400e"/><circle cx="318" cy="110" r="78" fill="#15803d"/><circle cx="262" cy="140" r="48" fill="#166534"/><g transform="rotate(38 420 190)"><rect x="380" y="182" width="120" height="16" fill="#92400e"/><circle cx="500" cy="190" r="34" fill="#15803d"/></g>
+  <rect x="0" y="300" width="640" height="60" fill="#0f172a" opacity=".72"/>
+  <text x="24" y="338" font-family="system-ui,Segoe UI,Arial,sans-serif" font-size="24" font-weight="700" fill="#fff">Áreas verdes</text>
+  <text x="616" y="337" text-anchor="end" font-family="system-ui,Segoe UI,Arial,sans-serif" font-size="16" fill="#cbd5e1">Imagen de ejemplo</text>
+</svg>

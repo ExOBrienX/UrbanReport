@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" width="640" height="360">
+  <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#94a3b8"/><stop offset="1" stop-color="#475569"/></linearGradient></defs>
+  <rect width="640" height="360" fill="url(#g)"/>
+  <rect x="0" y="150" width="640" height="150" fill="#334155"/><g fill="#e2e8f0"><rect x="40" y="218" width="90" height="10"/><rect x="200" y="218" width="90" height="10"/><rect x="520" y="218" width="90" height="10"/></g><ellipse cx="400" cy="232" rx="92" ry="34" fill="#0f172a"/><ellipse cx="392" cy="226" rx="66" ry="20" fill="#1e293b"/>
+  <rect x="0" y="300" width="640" height="60" fill="#0f172a" opacity=".72"/>
+  <text x="24" y="338" font-family="system-ui,Segoe UI,Arial,sans-serif" font-size="24" font-weight="700" fill="#fff">Pavimento</text>
+  <text x="616" y="337" text-anchor="end" font-family="system-ui,Segoe UI,Arial,sans-serif" font-size="16" fill="#cbd5e1">Imagen de ejemplo</text>
+</svg>

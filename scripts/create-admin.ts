@@ -3,6 +3,13 @@ import bcrypt from 'bcryptjs'
 
 const prisma = new PrismaClient()
 
+// La password inicial se lee del entorno para no dejar credenciales en el codigo
+const SEED_PASSWORD = process.env.SEED_ADMIN_PASSWORD ?? ''
+if (!SEED_PASSWORD) {
+  console.error('Define SEED_ADMIN_PASSWORD antes de ejecutar este script')
+  process.exit(1)
+}
+
 async function createAdminUser() {
   try {
     // Verificar si ya existe un admin
@@ -16,7 +23,7 @@ async function createAdminUser() {
     }
 
     // Crear usuario admin
-    const hashedPassword = await bcrypt.hash('password123', 10)
+    const hashedPassword = await bcrypt.hash(SEED_PASSWORD, 10)
 
     const adminUser = await prisma.usuario.create({
       data: {
@@ -32,7 +39,7 @@ async function createAdminUser() {
 
     console.log('Admin user created successfully:')
     console.log('- Email:', adminUser.email)
-    console.log('- Password: password123')
+    console.log('- Password: valor de SEED_ADMIN_PASSWORD')
     console.log('- Role:', adminUser.rol)
 
   } catch (error) {

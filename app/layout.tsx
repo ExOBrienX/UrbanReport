@@ -15,6 +15,8 @@ import type { Metadata } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
 import "./globals.css"
 import Providers from "./components/Provider"
+import DemoNotice from "./components/ui/DemoNotice"
+import { DEMO_MODE } from "./lib/demo"
 
 // Fuente principal — sans-serif para textos generales
 const geistSans = Geist({
@@ -47,6 +49,8 @@ export default function RootLayout({
         {/* Providers inyecta el contexto de sesion NextAuth en toda la app */}
         <Providers>
           {children}
+          {/* Aviso de modo demostracion — solo cuando no hay BD real conectada */}
+          {DEMO_MODE && <DemoNotice />}
         </Providers>
       </body>
     </html>

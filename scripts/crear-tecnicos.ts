@@ -3,6 +3,13 @@ import bcrypt from 'bcryptjs'
 
 const prisma = new PrismaClient()
 
+// La password inicial se lee del entorno para no dejar credenciales en el codigo
+const SEED_PASSWORD = process.env.SEED_TECNICO_PASSWORD ?? ''
+if (!SEED_PASSWORD) {
+  console.error('Define SEED_TECNICO_PASSWORD antes de ejecutar este script')
+  process.exit(1)
+}
+
 async function createTecnicos() {
   try {
     // Obtener categorías
@@ -31,7 +38,7 @@ async function createTecnicos() {
       }
     ]
 
-    const hashedPassword = await bcrypt.hash('tecnico123', 10)
+    const hashedPassword = await bcrypt.hash(SEED_PASSWORD, 10)
 
     for (const t of tecnicos) {
       // Verificar si ya existe

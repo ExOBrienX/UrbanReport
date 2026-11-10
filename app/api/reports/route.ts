@@ -25,6 +25,7 @@ import { IncidenciaService } from '../../lib/services/IncidenciaService'
 import { ResponseFactory } from '../../lib/factories/ResponseFactory'
 import { uploadPhoto } from '../../lib/uploadPhoto'
 import { prisma } from '../../lib/prisma'
+import { DEMO_MODE, DEMO_MENSAJE_ENVIO, getReportesDemo } from '../../lib/demo'
 
 // Constantes de validacion — centralizadas para facilitar ajustes futuros
 const MAX_FOTO_BYTES = 8 * 1024 * 1024   // 8MB — margen seguro para fotos comprimidas por canvas
@@ -37,6 +38,12 @@ const TIPOS_IMAGEN_PERMITIDOS = ['image/jpeg', 'image/png', 'image/webp']
 const TALCA_BOUNDS = { latMin: -35.52, latMax: -35.35, lonMin: -71.75, lonMax: -71.58 }
 
 export async function POST(request: NextRequest) {
+  // Modo demo — sin BD no se puede guardar ni clasificar el reporte
+  if (DEMO_MODE) {
+    const r = ResponseFactory.validacion(DEMO_MENSAJE_ENVIO)
+    return NextResponse.json(r.body, { status: r.status })
+  }
+
   try {
     const formData = await request.formData()
 
@@ -208,6 +215,11 @@ export async function POST(request: NextRequest) {
 
 // GET /api/reports — reportes activos para el mapa ciudadano
 export async function GET() {
+  // Modo demo — reportes de ejemplo con la misma forma que obtenerActivos()
+  if (DEMO_MODE) {
+    return NextResponse.json({ success: true, demo: true, reportes: getReportesDemo() })
+  }
+
   try {
     // obtenerActivos filtra descartados e incidencias completadas hace mas de 48h (RF-08)
     const reportes = await ReporteService.obtenerActivos()
